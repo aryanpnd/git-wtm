@@ -47,8 +47,6 @@ homebrew_casks:
     homepage: "https://github.com/aryanpnd/git-wtm"
     description: "Modern TUI for managing Git worktrees and branches"
     license: "MIT"
-    test: |
-      assert_match "must be run inside a git repository", shell_output("#{bin}/git-wtm 2>&1", 1)
 
 scoops:
   - repository:
