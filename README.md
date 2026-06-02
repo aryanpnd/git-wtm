@@ -30,6 +30,12 @@ Make sure `$GOPATH/bin` (usually `~/go/bin`) is in your PATH:
 export PATH="$PATH:$HOME/go/bin"
 ```
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install aryanpnd/tap/git-wtm
+```
+
 ### From source
 
 ```bash
@@ -37,13 +43,6 @@ git clone https://github.com/aryanpnd/git-wtm.git
 cd git-wtm
 go build -o git-wtm .
 sudo mv git-wtm /usr/local/bin/
-```
-
-### Homebrew (macOS/Linux)
-
-```bash
-# Coming soon
-brew install aryanpnd/tap/git-wtm
 ```
 
 ## Usage
