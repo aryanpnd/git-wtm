@@ -296,7 +296,7 @@ func (m Model) viewWtAdd() string {
 	s.WriteString("\n")
 	keys := []helpKey{{"enter", "create"}, {"↑/↓", "pick"}, {"tab", "edit path"}, {"esc", "cancel"}}
 	if m.addStep == 1 {
-		keys = []helpKey{{"enter", "create"}, {"tab", "back"}, {"esc", "back"}}
+		keys = []helpKey{{"enter", "create"}, {"ctrl+o", "browse"}, {"tab", "back"}, {"esc", "back"}}
 	}
 	s.WriteString(m.renderHelpLine(keys))
 
@@ -468,11 +468,8 @@ func (m Model) viewBrList() string {
 
 	listContent.WriteString(scrollInfo)
 
-	// Wrap in a bordered box
-	listWidth := m.width - 6
-	if listWidth > 74 {
-		listWidth = 74
-	}
+	// Wrap in a bordered box — match title width
+	listWidth := min(m.width-4, 70)
 	if listWidth < 40 {
 		listWidth = 40
 	}
@@ -484,7 +481,7 @@ func (m Model) viewBrList() string {
 		Width(listWidth).
 		Render(listContent.String())
 
-	s.WriteString("  " + listBox + "\n")
+	s.WriteString(listBox + "\n")
 
 	s.WriteString(m.renderMessages())
 	s.WriteString("\n")

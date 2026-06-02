@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -278,4 +279,32 @@ func GetLastCommitTime(path string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func PickFolder() (string, error) {
+	switch runtime.GOOS {
+	case "darwin":
+		out, err := exec.Command("osascript", "-e",
+			`set chosenFolder to POSIX path of (choose folder with prompt "Choose worktree location")`,
+		).Output()
+		if err != nil {
+			return "", fmt.Errorf("folder picker cancelled")
+		}
+		return strings.TrimSpace(string(out)), nil
+	case "linux":
+		out, err := exec.Command("zenity", "--file-selection", "--directory", "--title=Choose worktree location").Output()
+		if err != nil {
+			return "", fmt.Errorf("folder picker cancelled")
+		}
+		return strings.TrimSpace(string(out)), nil
+	case "windows":
+		script := `Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = "Choose worktree location"; if ($f.ShowDialog() -eq "OK") { $f.SelectedPath } else { exit 1 }`
+		out, err := exec.Command("powershell", "-Command", script).Output()
+		if err != nil {
+			return "", fmt.Errorf("folder picker cancelled")
+		}
+		return strings.TrimSpace(string(out)), nil
+	default:
+		return "", fmt.Errorf("folder picker not supported on this OS")
+	}
 }

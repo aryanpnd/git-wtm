@@ -44,6 +44,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = bool(msg)
 		return m, nil
 
+	case folderPickedMsg:
+		m.pathInput.SetValue(string(msg))
+		return m, nil
+
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -291,6 +295,14 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pathInput.Blur()
 			m.addInput.Focus()
 			return m, textinput.Blink
+		case "ctrl+o":
+			return m, func() tea.Msg {
+				path, err := git.PickFolder()
+				if err != nil {
+					return nil
+				}
+				return folderPickedMsg(path)
+			}
 		case "enter":
 			branch := m.addInput.Value()
 			if branch == "" {

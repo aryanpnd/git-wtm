@@ -76,6 +76,7 @@ type branchDetailMsg []git.Branch
 type errMsg struct{ err error }
 type statusMsg string
 type loadingMsg bool
+type folderPickedMsg string
 
 func (e errMsg) Error() string { return e.err.Error() }
 
