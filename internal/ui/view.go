@@ -16,196 +16,210 @@ func (m Model) View() string {
 	}
 
 	var s strings.Builder
+	s.WriteString(m.renderHeader())
+	s.WriteString(m.renderTabs())
+	s.WriteString("\n")
 
-	switch m.currentView {
-	case viewList:
-		s.WriteString(m.viewList())
-	case viewAdd:
-		s.WriteString(m.viewAdd())
-	case viewRemoveConfirm:
-		s.WriteString(m.viewRemoveConfirm())
-	case viewDetail:
-		s.WriteString(m.viewDetail())
+	switch m.activeTab {
+	case tabWorktrees:
+		s.WriteString(m.viewWorktreesTab())
+	case tabBranches:
+		s.WriteString(m.viewBranchesTab())
 	}
 
 	return s.String()
 }
 
-func (m Model) viewList() string {
+func (m Model) renderHeader() string {
+	logo := logoStyle.Render("git-wtm")
+	desc := dimStyle.Render(" worktree manager")
+	loading := ""
+	if m.loading {
+		loading = dimStyle.Render("  ⟳")
+	}
+	return logo + desc + loading + "\n\n"
+}
+
+func (m Model) renderTabs() string {
+	var tabs []string
+
+	wtLabel := "Worktrees"
+	brLabel := "Branches"
+
+	if m.activeTab == tabWorktrees {
+		tabs = append(tabs, activeTabStyle.Render(wtLabel))
+	} else {
+		tabs = append(tabs, inactiveTabStyle.Render(wtLabel))
+	}
+
+	tabs = append(tabs, tabSeparator.Render("│"))
+
+	if m.activeTab == tabBranches {
+		tabs = append(tabs, activeTabStyle.Render(brLabel))
+	} else {
+		tabs = append(tabs, inactiveTabStyle.Render(brLabel))
+	}
+
+	tabBar := lipgloss.JoinHorizontal(lipgloss.Center, tabs...)
+	hint := dimStyle.Render("  ← → to switch")
+	return tabBar + hint + "\n"
+}
+
+// ==========================================
+// WORKTREES TAB
+// ==========================================
+
+func (m Model) viewWorktreesTab() string {
+	switch m.wtView {
+	case viewList:
+		return m.viewWtList()
+	case viewAdd:
+		return m.viewWtAdd()
+	case viewRemoveConfirm:
+		return m.viewWtRemove()
+	case viewDetail:
+		return m.viewWtDetail()
+	}
+	return ""
+}
+
+func (m Model) viewWtList() string {
 	var s strings.Builder
 
-	header := titleStyle.Render(" 🌳 Worktree Manager ")
-	if m.loading {
-		header += dimStyle.Render("  ⟳ loading...")
-	}
-	count := dimStyle.Render(fmt.Sprintf("  %d worktrees", len(m.worktrees)))
-	s.WriteString(header + count + "\n\n")
-
-	if m.searching {
-		s.WriteString("  " + searchStyle.Render("🔍 ") + m.searchInput.View() + "\n\n")
-	} else if m.searchInput.Value() != "" {
-		s.WriteString("  " + dimStyle.Render(fmt.Sprintf("filter: %q (%d results)", m.searchInput.Value(), len(m.filtered))) + "\n\n")
+	if m.wtSearching {
+		s.WriteString("  " + searchStyle.Render("🔍 ") + m.wtSearch.View() + "\n\n")
+	} else if m.wtSearch.Value() != "" {
+		s.WriteString("  " + dimStyle.Render(fmt.Sprintf("filter: %q (%d)", m.wtSearch.Value(), len(m.wtFiltered))) + "\n\n")
 	}
 
 	if len(m.worktrees) == 0 && !m.loading {
 		s.WriteString(dimStyle.Render("  No worktrees found. Press 'a' to add one.\n"))
 	}
 
-	maxVisible := m.height - 10
-	if maxVisible < 2 {
-		maxVisible = 2
-	}
-	// Each card takes ~4 lines, so divide available space
-	maxCards := maxVisible / 4
+	maxCards := (m.height - 10) / 4
 	if maxCards < 1 {
 		maxCards = 1
 	}
 
 	visibleStart := 0
-	if m.cursor >= maxCards {
-		visibleStart = m.cursor - maxCards + 1
+	if m.wtCursor >= maxCards {
+		visibleStart = m.wtCursor - maxCards + 1
 	}
-
 	end := visibleStart + maxCards
-	if end > len(m.filtered) {
-		end = len(m.filtered)
+	if end > len(m.wtFiltered) {
+		end = len(m.wtFiltered)
 	}
 
-	cardWidth := m.width - 4
-	if cardWidth > 80 {
-		cardWidth = 80
+	cardWidth := m.width - 6
+	if cardWidth > 76 {
+		cardWidth = 76
 	}
 	if cardWidth < 40 {
 		cardWidth = 40
 	}
 
 	for vi := visibleStart; vi < end; vi++ {
-		idx := m.filtered[vi]
+		idx := m.wtFiltered[vi]
 		wt := m.worktrees[idx]
-		isSelected := vi == m.cursor
-		s.WriteString(m.renderWorktreeCard(wt, isSelected, cardWidth))
+		isSelected := vi == m.wtCursor
+		s.WriteString(m.renderWtCard(wt, isSelected, cardWidth))
 	}
 
-	if len(m.filtered) > maxCards {
-		s.WriteString(dimStyle.Render(fmt.Sprintf("  ↕ showing %d of %d", maxCards, len(m.filtered))) + "\n")
+	if len(m.wtFiltered) > maxCards {
+		s.WriteString(dimStyle.Render(fmt.Sprintf("  ↕ %d of %d", maxCards, len(m.wtFiltered))) + "\n")
 	}
 
-	if m.statusMsg != "" {
-		s.WriteString("\n " + successStyle.Render("✓ "+m.statusMsg) + "\n")
-	}
-	if m.err != nil {
-		s.WriteString("\n " + errorStyle.Render("✗ "+m.err.Error()) + "\n")
-	}
-
+	s.WriteString(m.renderMessages())
 	s.WriteString("\n")
+
 	if m.showHelp {
-		s.WriteString(m.fullHelp())
+		s.WriteString(m.wtFullHelp())
 	} else {
-		s.WriteString(m.shortHelp())
+		s.WriteString(m.wtShortHelp())
 	}
 
 	return s.String()
 }
 
-func (m Model) renderWorktreeCard(wt git.Worktree, selected bool, width int) string {
-	// Build tags
+func (m Model) renderWtCard(wt git.Worktree, selected bool, width int) string {
+	// Tags
 	var tags []string
 	if wt.IsPrimary {
-		tags = append(tags, tagMain.Render("PRIMARY"))
+		tags = append(tags, tagPrimary.Render("PRIMARY"))
 	}
 	if wt.IsCurrent {
-		tags = append(tags, tagCurrent.Render("ACTIVE"))
+		tags = append(tags, tagActive.Render("ACTIVE"))
 	}
 	if wt.IsDetached {
 		tags = append(tags, tagDetached.Render("DETACHED"))
 	}
 	if wt.Status.IsDirty {
-		tags = append(tags, tagDirty.Render("UNSAVED CHANGES"))
+		tags = append(tags, tagUnsaved.Render("UNSAVED CHANGES"))
 	} else {
 		tags = append(tags, tagClean.Render("✓ clean"))
 	}
 
-	// Line 1: branch + tags
-	branchDisplay := branchStyle.Render(" " + wt.Branch)
-	tagLine := strings.Join(tags, " ")
-	line1 := branchDisplay + "  " + tagLine
+	line1 := " " + branchStyle.Render(wt.Branch) + "  " + strings.Join(tags, " ")
 
-	// Line 2: status details with labels
-	var statusParts []string
+	// Status line
+	var parts []string
 	if wt.Status.Modified > 0 {
-		statusParts = append(statusParts, warningStyle.Render(fmt.Sprintf("%d modified", wt.Status.Modified)))
+		parts = append(parts, warningStyle.Render(fmt.Sprintf("%d modified", wt.Status.Modified)))
 	}
 	if wt.Status.Added > 0 {
-		statusParts = append(statusParts, successStyle.Render(fmt.Sprintf("%d added", wt.Status.Added)))
+		parts = append(parts, successStyle.Render(fmt.Sprintf("%d added", wt.Status.Added)))
 	}
 	if wt.Status.Deleted > 0 {
-		statusParts = append(statusParts, errorStyle.Render(fmt.Sprintf("%d deleted", wt.Status.Deleted)))
+		parts = append(parts, errorStyle.Render(fmt.Sprintf("%d deleted", wt.Status.Deleted)))
 	}
 	if wt.Status.Untracked > 0 {
-		statusParts = append(statusParts, dimStyle.Render(fmt.Sprintf("%d untracked", wt.Status.Untracked)))
+		parts = append(parts, dimStyle.Render(fmt.Sprintf("%d untracked", wt.Status.Untracked)))
 	}
-
-	syncParts := ""
 	if wt.Ahead > 0 {
-		syncParts += aheadStyle.Render(fmt.Sprintf("↑ %d ahead", wt.Ahead))
+		parts = append(parts, aheadStyle.Render(fmt.Sprintf("↑ %d ahead", wt.Ahead)))
 	}
 	if wt.Behind > 0 {
-		if syncParts != "" {
-			syncParts += "  "
-		}
-		syncParts += behindStyle.Render(fmt.Sprintf("↓ %d behind", wt.Behind))
+		parts = append(parts, behindStyle.Render(fmt.Sprintf("↓ %d behind", wt.Behind)))
 	}
 
 	line2 := ""
-	if len(statusParts) > 0 || syncParts != "" {
-		line2 = " " + strings.Join(statusParts, " ")
-		if syncParts != "" {
-			if line2 != " " {
-				line2 += "  "
-			}
-			line2 += syncParts
-		}
+	if len(parts) > 0 {
+		line2 = " " + strings.Join(parts, dimStyle.Render(" · "))
 	}
 
-	// Line 3: commit + message
+	// Commit
 	lastMsg := git.GetLastCommitMessage(wt.Path)
-	if len(lastMsg) > 45 {
-		lastMsg = lastMsg[:42] + "..."
+	if len(lastMsg) > 42 {
+		lastMsg = lastMsg[:39] + "..."
 	}
 	line3 := " " + dimStyle.Render("commit ") + commitStyle.Render(wt.Head) + " " + dimStyle.Render(lastMsg)
 
-	// Line 4: path
+	// Path
 	line4 := " " + dimStyle.Render("path   ") + pathStyle.Render(shortenPath(wt.Path))
 
-	// Compose card content
 	content := line1
-	if line2 != "" && line2 != " " {
+	if line2 != "" {
 		content += "\n" + line2
 	}
-	content += "\n" + line3
-	content += "\n" + line4
+	content += "\n" + line3 + "\n" + line4
 
-	// Choose border style
-	border := cardBorder
+	// Border
+	border := cardBorder.Width(width)
 	if selected && wt.IsCurrent {
-		border = cardBorderCurrent.Width(width)
+		border = cardBorderActive.Width(width)
 	} else if selected {
 		border = cardBorderSelected.Width(width)
 	} else if wt.IsCurrent {
-		border = cardBorderCurrent.Width(width)
-	} else {
-		border = cardBorder.Width(width)
+		border = cardBorderActive.Width(width)
 	}
 
-	// Cursor indicator
+	card := border.Render(content)
+
 	cursor := "  "
 	if selected {
 		cursor = "▸ "
 	}
 
-	card := border.Render(content)
-
-	// Prepend cursor to first line of card
 	lines := strings.Split(card, "\n")
 	if len(lines) > 0 {
 		lines[0] = cursor + lines[0]
@@ -217,12 +231,11 @@ func (m Model) renderWorktreeCard(wt git.Worktree, selected bool, width int) str
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func (m Model) viewAdd() string {
+func (m Model) viewWtAdd() string {
 	var s strings.Builder
 
-	s.WriteString(titleStyle.Render(" Add Worktree ") + "\n\n")
+	s.WriteString("  " + titleStyle.Render("Add Worktree") + "\n\n")
 
-	// Branch input
 	branchLabel := activeInputStyle.Render("  Branch ")
 	pathLabel := inactiveInputStyle.Render("  Path   ")
 	if m.addStep == 1 {
@@ -230,16 +243,14 @@ func (m Model) viewAdd() string {
 		pathLabel = activeInputStyle.Render("  Path   ")
 	}
 
-	s.WriteString(fmt.Sprintf("%s %s\n", branchLabel, m.branchInput.View()))
+	s.WriteString(fmt.Sprintf("%s %s\n", branchLabel, m.addInput.View()))
 
-	// Matching branches dropdown
 	if m.addStep == 0 && len(m.addMatches) > 0 {
-		maxShow := 6
+		maxShow := 5
 		if maxShow > len(m.addMatches) {
 			maxShow = len(m.addMatches)
 		}
-
-		var dropdownLines []string
+		var lines []string
 		for i := 0; i < maxShow; i++ {
 			prefix := "  "
 			style := dimStyle
@@ -247,10 +258,10 @@ func (m Model) viewAdd() string {
 				prefix = "▸ "
 				style = selectedItemStyle
 			}
-			dropdownLines = append(dropdownLines, prefix+style.Render(m.addMatches[i]))
+			lines = append(lines, prefix+style.Render(m.addMatches[i]))
 		}
 		if len(m.addMatches) > maxShow {
-			dropdownLines = append(dropdownLines, dimStyle.Render(fmt.Sprintf("  ... %d more", len(m.addMatches)-maxShow)))
+			lines = append(lines, dimStyle.Render(fmt.Sprintf("  +%d more", len(m.addMatches)-maxShow)))
 		}
 
 		dropdown := lipgloss.NewStyle().
@@ -258,69 +269,51 @@ func (m Model) viewAdd() string {
 			BorderForeground(dimGray).
 			Padding(0, 1).
 			MarginLeft(11).
-			Render(strings.Join(dropdownLines, "\n"))
-
+			Render(strings.Join(lines, "\n"))
 		s.WriteString(dropdown + "\n")
 	}
 
-	// "New branch" hint
-	if m.addStep == 0 && m.branchInput.Value() != "" && len(m.addMatches) == 0 {
-		hint := lipgloss.NewStyle().
-			MarginLeft(11).
-			Foreground(green).
-			Bold(true).
-			Render("+ new branch will be created")
-		s.WriteString("\n" + hint + "\n")
+	if m.addStep == 0 && m.addInput.Value() != "" && len(m.addMatches) == 0 {
+		s.WriteString(lipgloss.NewStyle().MarginLeft(11).Foreground(green).Bold(true).Render("+ new branch will be created") + "\n")
 	}
 
 	s.WriteString("\n")
 	s.WriteString(fmt.Sprintf("%s %s\n", pathLabel, m.pathInput.View()))
 
-	// Default path hint
-	branchVal := m.branchInput.Value()
+	branchVal := m.addInput.Value()
 	if m.addCursor >= 0 && m.addCursor < len(m.addMatches) {
 		branchVal = m.addMatches[m.addCursor]
 	}
 	if branchVal != "" {
-		defaultPath := git.DefaultWorktreePath(branchVal)
-		s.WriteString(dimStyle.Render(fmt.Sprintf("           → %s", shortenPath(defaultPath))) + "\n")
+		s.WriteString(dimStyle.Render(fmt.Sprintf("           → %s", shortenPath(git.DefaultWorktreePath(branchVal)))) + "\n")
 	}
 
 	s.WriteString("\n")
-	helpKeys := []helpKey{
-		{"enter", "create"},
-		{"↑/↓", "pick branch"},
-		{"tab", "edit path"},
-		{"esc", "cancel"},
-	}
+	keys := []helpKey{{"enter", "create"}, {"↑/↓", "pick"}, {"tab", "edit path"}, {"esc", "cancel"}}
 	if m.addStep == 1 {
-		helpKeys = []helpKey{
-			{"enter", "create"},
-			{"tab", "back to branch"},
-			{"esc", "back"},
-		}
+		keys = []helpKey{{"enter", "create"}, {"tab", "back"}, {"esc", "back"}}
 	}
-	s.WriteString(m.renderHelpLine(helpKeys))
+	s.WriteString(m.renderHelpLine(keys))
 
 	return s.String()
 }
 
-func (m Model) viewRemoveConfirm() string {
+func (m Model) viewWtRemove() string {
 	var s strings.Builder
 
-	s.WriteString(titleStyle.Render(" Remove Worktree ") + "\n\n")
+	s.WriteString("  " + titleStyle.Render("Remove Worktree") + "\n\n")
 
 	wt := m.selectedWorktree()
 	if wt == nil {
-		s.WriteString(dimStyle.Render("  No worktree selected.\n"))
-		return s.String()
+		return dimStyle.Render("  No worktree selected.\n")
 	}
 
-	content := fmt.Sprintf("%s %s\n\n", detailLabelStyle.Render("Path:"), errorStyle.Render(shortenPath(wt.Path)))
-	content += fmt.Sprintf("%s %s\n", detailLabelStyle.Render("Branch:"), branchStyle.Render(wt.Branch))
+	content := fmt.Sprintf("%s %s\n\n%s %s",
+		detailLabelStyle.Render("Branch:"), branchStyle.Render(wt.Branch),
+		detailLabelStyle.Render("Path:"), errorStyle.Render(shortenPath(wt.Path)))
 
 	if wt.Status.IsDirty {
-		content += "\n" + warningStyle.Render("⚠ This worktree has uncommitted changes!")
+		content += "\n\n" + warningStyle.Render("⚠ Has uncommitted changes!")
 	}
 
 	forceLabel := dimStyle.Render("off")
@@ -330,37 +323,27 @@ func (m Model) viewRemoveConfirm() string {
 	content += fmt.Sprintf("\n\n%s %s", detailLabelStyle.Render("Force:"), forceLabel)
 
 	s.WriteString(boxStyle.Render(content) + "\n\n")
-
-	s.WriteString(m.renderHelpLine([]helpKey{
-		{"y", "confirm"},
-		{"n/esc", "cancel"},
-		{"f", "toggle force"},
-	}))
+	s.WriteString(m.renderHelpLine([]helpKey{{"y", "confirm"}, {"n/esc", "cancel"}, {"f", "toggle force"}}))
 
 	return s.String()
 }
 
-func (m Model) viewDetail() string {
+func (m Model) viewWtDetail() string {
 	var s strings.Builder
 
 	wt := m.selectedWorktree()
 	if wt == nil {
-		s.WriteString(dimStyle.Render("  No worktree selected.\n"))
-		return s.String()
+		return dimStyle.Render("  No worktree selected.\n")
 	}
 
-	s.WriteString(titleStyle.Render(" Worktree Details ") + "\n\n")
+	s.WriteString("  " + titleStyle.Render("Worktree Details") + "\n\n")
 
-	// Tags
 	var tags []string
 	if wt.IsPrimary {
-		tags = append(tags, tagMain.Render("PRIMARY"))
+		tags = append(tags, tagPrimary.Render("PRIMARY"))
 	}
 	if wt.IsCurrent {
-		tags = append(tags, tagCurrent.Render("ACTIVE"))
-	}
-	if wt.IsDetached {
-		tags = append(tags, tagDetached.Render("DETACHED"))
+		tags = append(tags, tagActive.Render("ACTIVE"))
 	}
 	if len(tags) > 0 {
 		s.WriteString("  " + strings.Join(tags, " ") + "\n\n")
@@ -369,21 +352,13 @@ func (m Model) viewDetail() string {
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Branch:"), branchStyle.Render(wt.Branch)))
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Path:"), detailValueStyle.Render(wt.Path)))
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("HEAD:"), commitStyle.Render(wt.Head)))
-
-	lastMsg := git.GetLastCommitMessage(wt.Path)
-	lastTime := git.GetLastCommitTime(wt.Path)
-	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Commit:"), detailValueStyle.Render(lastMsg)))
-	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Time:"), dimStyle.Render(lastTime)))
+	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Commit:"), detailValueStyle.Render(git.GetLastCommitMessage(wt.Path))))
+	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Time:"), dimStyle.Render(git.GetLastCommitTime(wt.Path))))
 
 	s.WriteString("\n  " + separatorStyle.Render(strings.Repeat("─", 40)) + "\n\n")
 
-	statusLabel := statusClean.Render("Clean ✓")
 	if wt.Status.IsDirty {
-		statusLabel = statusDirty.Render("Dirty")
-	}
-	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Status:"), statusLabel))
-
-	if wt.Status.IsDirty {
+		s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Status:"), statusDirty.Render("Unsaved changes")))
 		if wt.Status.Modified > 0 {
 			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render(""), warningStyle.Render(fmt.Sprintf("%d modified", wt.Status.Modified))))
 		}
@@ -396,26 +371,242 @@ func (m Model) viewDetail() string {
 		if wt.Status.Untracked > 0 {
 			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render(""), dimStyle.Render(fmt.Sprintf("%d untracked", wt.Status.Untracked))))
 		}
-	}
-
-	if wt.Ahead > 0 || wt.Behind > 0 {
-		s.WriteString("\n")
-		if wt.Ahead > 0 {
-			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Ahead:"), aheadStyle.Render(fmt.Sprintf("↑ %d commits", wt.Ahead))))
-		}
-		if wt.Behind > 0 {
-			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Behind:"), behindStyle.Render(fmt.Sprintf("↓ %d commits", wt.Behind))))
-		}
+	} else {
+		s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Status:"), statusClean.Render("Clean ✓")))
 	}
 
 	s.WriteString("\n")
-	keys := []helpKey{{"o", "open terminal"}, {"e", "open editor"}}
+	keys := []helpKey{{"o", "terminal"}, {"e", "editor"}}
 	if !wt.IsCurrent {
 		keys = append(keys, helpKey{"d", "remove"})
 	}
 	keys = append(keys, helpKey{"esc", "back"})
 	s.WriteString(m.renderHelpLine(keys))
 
+	return s.String()
+}
+
+// ==========================================
+// BRANCHES TAB
+// ==========================================
+
+func (m Model) viewBranchesTab() string {
+	switch m.brView {
+	case viewList:
+		return m.viewBrList()
+	case viewBranchDetail:
+		return m.viewBrDetail()
+	case viewBranchCreate:
+		return m.viewBrCreate()
+	case viewBranchRename:
+		return m.viewBrRename()
+	case viewBranchDelete:
+		return m.viewBrDelete()
+	}
+	return ""
+}
+
+func (m Model) viewBrList() string {
+	var s strings.Builder
+
+	if m.brSearching {
+		s.WriteString("  " + searchStyle.Render("🔍 ") + m.brSearch.View() + "\n\n")
+	} else if m.brSearch.Value() != "" {
+		s.WriteString("  " + dimStyle.Render(fmt.Sprintf("filter: %q (%d)", m.brSearch.Value(), len(m.brFiltered))) + "\n\n")
+	}
+
+	if len(m.branchList) == 0 && !m.loading {
+		s.WriteString(dimStyle.Render("  No branches found.\n"))
+	}
+
+	maxVisible := m.height - 10
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+
+	visibleStart := 0
+	if m.brCursor >= maxVisible {
+		visibleStart = m.brCursor - maxVisible + 1
+	}
+	end := visibleStart + maxVisible
+	if end > len(m.brFiltered) {
+		end = len(m.brFiltered)
+	}
+
+	for vi := visibleStart; vi < end; vi++ {
+		idx := m.brFiltered[vi]
+		b := m.branchList[idx]
+		isSelected := vi == m.brCursor
+		s.WriteString(m.renderBranchItem(b, isSelected))
+	}
+
+	if len(m.brFiltered) > maxVisible {
+		s.WriteString(dimStyle.Render(fmt.Sprintf("\n  ↕ %d of %d", maxVisible, len(m.brFiltered))) + "\n")
+	}
+
+	s.WriteString(m.renderMessages())
+	s.WriteString("\n")
+
+	if m.showHelp {
+		s.WriteString(m.brFullHelp())
+	} else {
+		s.WriteString(m.brShortHelp())
+	}
+
+	return s.String()
+}
+
+func (m Model) renderBranchItem(b git.Branch, selected bool) string {
+	cursor := "  "
+	style := dimStyle
+	if selected {
+		cursor = "▸ "
+		style = selectedItemStyle
+	}
+
+	name := style.Render(b.Name)
+	if !selected {
+		name = branchStyle.Render(b.Name)
+	}
+
+	// Tags
+	var tags []string
+	if b.IsCurrent {
+		tags = append(tags, tagActive.Render("ACTIVE"))
+	}
+	if b.Upstream != "" {
+		tags = append(tags, tagTracked.Render("TRACKED"))
+	} else {
+		tags = append(tags, tagLocal.Render("local"))
+	}
+
+	// Sync info
+	var sync []string
+	if b.Ahead > 0 {
+		sync = append(sync, aheadStyle.Render(fmt.Sprintf("↑%d", b.Ahead)))
+	}
+	if b.Behind > 0 {
+		sync = append(sync, behindStyle.Render(fmt.Sprintf("↓%d", b.Behind)))
+	}
+
+	line := cursor + name + "  " + strings.Join(tags, " ")
+	if len(sync) > 0 {
+		line += "  " + strings.Join(sync, " ")
+	}
+
+	// Second line: last commit time
+	detail := "     " + dimStyle.Render(b.CommitTime)
+	if b.Upstream != "" {
+		detail += dimStyle.Render(" → "+b.Upstream)
+	}
+
+	return line + "\n" + detail + "\n\n"
+}
+
+func (m Model) viewBrDetail() string {
+	var s strings.Builder
+
+	b := m.selectedBranch()
+	if b == nil {
+		return dimStyle.Render("  No branch selected.\n")
+	}
+
+	s.WriteString("  " + titleStyle.Render("Branch Details") + "\n\n")
+
+	var tags []string
+	if b.IsCurrent {
+		tags = append(tags, tagActive.Render("ACTIVE"))
+	}
+	if b.Upstream != "" {
+		tags = append(tags, tagTracked.Render("TRACKED"))
+	} else {
+		tags = append(tags, tagLocal.Render("local only"))
+	}
+	s.WriteString("  " + strings.Join(tags, " ") + "\n\n")
+
+	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Name:"), branchStyle.Render(b.Name)))
+	if b.Upstream != "" {
+		s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Upstream:"), detailValueStyle.Render(b.Upstream)))
+	}
+	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Last:"), dimStyle.Render(b.CommitTime)))
+	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Commit:"), commitStyle.Render(b.LastCommit)))
+
+	if b.Ahead > 0 || b.Behind > 0 {
+		s.WriteString("\n")
+		if b.Ahead > 0 {
+			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Ahead:"), aheadStyle.Render(fmt.Sprintf("↑ %d commits", b.Ahead))))
+		}
+		if b.Behind > 0 {
+			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Behind:"), behindStyle.Render(fmt.Sprintf("↓ %d commits", b.Behind))))
+		}
+	}
+
+	s.WriteString("\n")
+	keys := []helpKey{{"c", "checkout"}}
+	if !b.IsCurrent {
+		keys = append(keys, helpKey{"d", "delete"})
+	}
+	keys = append(keys, helpKey{"esc", "back"})
+	s.WriteString(m.renderHelpLine(keys))
+
+	return s.String()
+}
+
+func (m Model) viewBrCreate() string {
+	var s strings.Builder
+	s.WriteString("  " + titleStyle.Render("Create Branch") + "\n\n")
+	s.WriteString(fmt.Sprintf("  %s %s\n\n", activeInputStyle.Render("Name"), m.brCreateInput.View()))
+	s.WriteString(dimStyle.Render("  Branch will be created from current HEAD") + "\n\n")
+	s.WriteString(m.renderHelpLine([]helpKey{{"enter", "create"}, {"esc", "cancel"}}))
+	return s.String()
+}
+
+func (m Model) viewBrRename() string {
+	var s strings.Builder
+	b := m.selectedBranch()
+	s.WriteString("  " + titleStyle.Render("Rename Branch") + "\n\n")
+	if b != nil {
+		s.WriteString("  " + dimStyle.Render("Renaming: "+b.Name) + "\n\n")
+	}
+	s.WriteString(fmt.Sprintf("  %s %s\n\n", activeInputStyle.Render("New name"), m.brRenameInput.View()))
+	s.WriteString(m.renderHelpLine([]helpKey{{"enter", "rename"}, {"esc", "cancel"}}))
+	return s.String()
+}
+
+func (m Model) viewBrDelete() string {
+	var s strings.Builder
+	s.WriteString("  " + titleStyle.Render("Delete Branch") + "\n\n")
+
+	b := m.selectedBranch()
+	if b == nil {
+		return dimStyle.Render("  No branch selected.\n")
+	}
+
+	content := fmt.Sprintf("%s %s", detailLabelStyle.Render("Branch:"), errorStyle.Render(b.Name))
+	forceLabel := dimStyle.Render("off")
+	if m.brDeleteForce {
+		forceLabel = errorStyle.Render("ON (unmerged commits will be lost)")
+	}
+	content += fmt.Sprintf("\n\n%s %s", detailLabelStyle.Render("Force:"), forceLabel)
+
+	s.WriteString(boxStyle.Render(content) + "\n\n")
+	s.WriteString(m.renderHelpLine([]helpKey{{"y", "confirm"}, {"n/esc", "cancel"}, {"f", "toggle force"}}))
+
+	return s.String()
+}
+
+// ==========================================
+// SHARED HELPERS
+// ==========================================
+
+func (m Model) renderMessages() string {
+	var s strings.Builder
+	if m.statusMsg != "" {
+		s.WriteString("\n " + successStyle.Render("✓ "+m.statusMsg))
+	}
+	if m.err != nil {
+		s.WriteString("\n " + errorStyle.Render("✗ "+m.err.Error()))
+	}
 	return s.String()
 }
 
@@ -432,7 +623,7 @@ func (m Model) renderHelpLine(keys []helpKey) string {
 	return helpStyle.Render("  ") + strings.Join(parts, helpStyle.Render("  •  "))
 }
 
-func (m Model) shortHelp() string {
+func (m Model) wtShortHelp() string {
 	return m.renderHelpLine([]helpKey{
 		{"a", "add"},
 		{"/", "search"},
@@ -444,51 +635,63 @@ func (m Model) shortHelp() string {
 	})
 }
 
-func (m Model) fullHelp() string {
+func (m Model) brShortHelp() string {
+	return m.renderHelpLine([]helpKey{
+		{"c", "checkout"},
+		{"a", "create"},
+		{"R", "rename"},
+		{"d", "delete"},
+		{"/", "search"},
+		{"?", "help"},
+		{"q", "quit"},
+	})
+}
+
+func (m Model) wtFullHelp() string {
 	var s strings.Builder
-
-	s.WriteString(subtitleStyle.Render("  Keybindings") + "\n\n")
-
+	s.WriteString(subtitleStyle.Render("  Worktree Keys") + "\n\n")
 	sections := []struct {
 		title string
 		keys  []helpKey
 	}{
-		{"Navigation", []helpKey{
-			{"j/↓", "move down"},
-			{"k/↑", "move up"},
-			{"enter", "view details"},
-			{"/", "search/filter"},
-		}},
-		{"Actions", []helpKey{
-			{"a", "add worktree (type to search or create)"},
-			{"d", "remove worktree"},
-			{"p", "prune stale worktrees"},
-		}},
-		{"Tools", []helpKey{
-			{"o", "open terminal in worktree"},
-			{"e", "open editor in worktree"},
-			{"f", "fetch all remotes"},
-			{"r", "refresh list"},
-		}},
-		{"General", []helpKey{
-			{"?", "toggle help"},
-			{"q", "quit"},
-			{"ctrl+c", "force quit"},
-		}},
+		{"Navigate", []helpKey{{"j/↓", "down"}, {"k/↑", "up"}, {"enter", "details"}, {"/", "search"}}},
+		{"Actions", []helpKey{{"a", "add worktree"}, {"d", "remove"}, {"p", "prune stale"}}},
+		{"Tools", []helpKey{{"o", "open terminal"}, {"e", "open editor"}, {"f", "fetch"}, {"r", "refresh"}}},
 	}
-
 	for _, sec := range sections {
 		s.WriteString(dimStyle.Render("  "+sec.title) + "\n")
 		for _, k := range sec.keys {
 			s.WriteString(fmt.Sprintf("    %s  %s\n",
-				helpKeyStyle.Render(lipgloss.NewStyle().Width(10).Render(k.key)),
-				helpStyle.Render(k.desc),
-			))
+				helpKeyStyle.Render(lipgloss.NewStyle().Width(8).Render(k.key)),
+				helpStyle.Render(k.desc)))
 		}
 		s.WriteString("\n")
 	}
+	s.WriteString(helpStyle.Render("  ? to close"))
+	return s.String()
+}
 
-	s.WriteString(helpStyle.Render("  Press ? to close help"))
+func (m Model) brFullHelp() string {
+	var s strings.Builder
+	s.WriteString(subtitleStyle.Render("  Branch Keys") + "\n\n")
+	sections := []struct {
+		title string
+		keys  []helpKey
+	}{
+		{"Navigate", []helpKey{{"j/↓", "down"}, {"k/↑", "up"}, {"enter", "details"}, {"/", "search"}}},
+		{"Actions", []helpKey{{"c", "checkout"}, {"a/n", "create"}, {"R", "rename"}, {"d", "delete"}, {"m", "merge into current"}}},
+		{"Tools", []helpKey{{"f", "fetch remotes"}, {"r", "refresh"}}},
+	}
+	for _, sec := range sections {
+		s.WriteString(dimStyle.Render("  "+sec.title) + "\n")
+		for _, k := range sec.keys {
+			s.WriteString(fmt.Sprintf("    %s  %s\n",
+				helpKeyStyle.Render(lipgloss.NewStyle().Width(8).Render(k.key)),
+				helpStyle.Render(k.desc)))
+		}
+		s.WriteString("\n")
+	}
+	s.WriteString(helpStyle.Render("  ? to close"))
 	return s.String()
 }
 

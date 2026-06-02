@@ -9,6 +9,13 @@ import (
 	"github.com/aryanpnd/git-wtm/internal/git"
 )
 
+type tab int
+
+const (
+	tabWorktrees tab = iota
+	tabBranches
+)
+
 type view int
 
 const (
@@ -16,32 +23,56 @@ const (
 	viewAdd
 	viewRemoveConfirm
 	viewDetail
+	viewBranchDetail
+	viewBranchCreate
+	viewBranchRename
+	viewBranchDelete
 )
 
 type Model struct {
-	worktrees    []git.Worktree
-	filtered     []int
-	branches     []string
-	cursor       int
-	currentView  view
-	width        int
-	height       int
-	err          error
-	statusMsg    string
-	pathInput    textinput.Model
-	branchInput  textinput.Model
-	searchInput  textinput.Model
-	addStep      int // 0=branch, 1=path
-	addMatches   []string
-	addCursor    int
+	// Global
+	activeTab tab
+	width     int
+	height    int
+	err       error
+	statusMsg string
+	loading   bool
+	showHelp  bool
+
+	// Worktrees tab
+	worktrees   []git.Worktree
+	wtFiltered  []int
+	wtCursor    int
+	wtView      view
+	wtSearch    textinput.Model
+	wtSearching bool
+
+	// Add worktree
+	branches   []string
+	addInput   textinput.Model
+	pathInput  textinput.Model
+	addMatches []string
+	addCursor  int
+	addStep    int
+
+	// Remove worktree
 	confirmForce bool
-	searching    bool
-	loading      bool
-	showHelp     bool
+
+	// Branches tab
+	branchList     []git.Branch
+	brFiltered     []int
+	brCursor       int
+	brView         view
+	brSearch       textinput.Model
+	brSearching    bool
+	brCreateInput  textinput.Model
+	brRenameInput  textinput.Model
+	brDeleteForce  bool
 }
 
 type worktreeListMsg []git.Worktree
 type branchListMsg []string
+type branchDetailMsg []git.Branch
 type errMsg struct{ err error }
 type statusMsg string
 type loadingMsg bool
@@ -49,24 +80,41 @@ type loadingMsg bool
 func (e errMsg) Error() string { return e.err.Error() }
 
 func NewModel() Model {
-	pi := textinput.New()
-	pi.Placeholder = "leave empty for default path"
-	pi.CharLimit = 200
+	wtSearch := textinput.New()
+	wtSearch.Placeholder = "filter worktrees..."
+	wtSearch.CharLimit = 100
 
-	bi := textinput.New()
-	bi.Placeholder = "type branch name..."
-	bi.CharLimit = 100
+	addInput := textinput.New()
+	addInput.Placeholder = "type branch name..."
+	addInput.CharLimit = 100
 
-	si := textinput.New()
-	si.Placeholder = "type to filter..."
-	si.CharLimit = 100
+	pathInput := textinput.New()
+	pathInput.Placeholder = "leave empty for default path"
+	pathInput.CharLimit = 200
+
+	brSearch := textinput.New()
+	brSearch.Placeholder = "filter branches..."
+	brSearch.CharLimit = 100
+
+	brCreate := textinput.New()
+	brCreate.Placeholder = "new-branch-name"
+	brCreate.CharLimit = 100
+
+	brRename := textinput.New()
+	brRename.Placeholder = "new name..."
+	brRename.CharLimit = 100
 
 	return Model{
-		currentView: viewList,
-		pathInput:   pi,
-		branchInput: bi,
-		searchInput: si,
-		addCursor:   -1,
+		activeTab:     tabWorktrees,
+		wtView:        viewList,
+		brView:        viewList,
+		wtSearch:      wtSearch,
+		addInput:      addInput,
+		pathInput:     pathInput,
+		brSearch:      brSearch,
+		brCreateInput: brCreate,
+		brRenameInput: brRename,
+		addCursor:     -1,
 	}
 }
 
@@ -75,6 +123,7 @@ func (m Model) Init() tea.Cmd {
 		func() tea.Msg { return loadingMsg(true) },
 		fetchWorktrees,
 		fetchBranches,
+		fetchBranchDetails,
 	)
 }
 
@@ -94,23 +143,44 @@ func fetchBranches() tea.Msg {
 	return branchListMsg(branches)
 }
 
-func (m *Model) applyFilter() {
-	query := strings.ToLower(m.searchInput.Value())
-	m.filtered = nil
+func fetchBranchDetails() tea.Msg {
+	branches, err := git.ListBranchesDetailed()
+	if err != nil {
+		return errMsg{err}
+	}
+	return branchDetailMsg(branches)
+}
+
+func (m *Model) applyWtFilter() {
+	query := strings.ToLower(m.wtSearch.Value())
+	m.wtFiltered = nil
 	for i, wt := range m.worktrees {
 		if query == "" ||
 			strings.Contains(strings.ToLower(wt.Branch), query) ||
 			strings.Contains(strings.ToLower(wt.Path), query) {
-			m.filtered = append(m.filtered, i)
+			m.wtFiltered = append(m.wtFiltered, i)
 		}
 	}
-	if m.cursor >= len(m.filtered) {
-		m.cursor = max(0, len(m.filtered)-1)
+	if m.wtCursor >= len(m.wtFiltered) {
+		m.wtCursor = max(0, len(m.wtFiltered)-1)
+	}
+}
+
+func (m *Model) applyBrFilter() {
+	query := strings.ToLower(m.brSearch.Value())
+	m.brFiltered = nil
+	for i, b := range m.branchList {
+		if query == "" || strings.Contains(strings.ToLower(b.Name), query) {
+			m.brFiltered = append(m.brFiltered, i)
+		}
+	}
+	if m.brCursor >= len(m.brFiltered) {
+		m.brCursor = max(0, len(m.brFiltered)-1)
 	}
 }
 
 func (m *Model) updateAddMatches() {
-	query := strings.ToLower(m.branchInput.Value())
+	query := strings.ToLower(m.addInput.Value())
 	m.addMatches = nil
 	if query == "" {
 		m.addCursor = -1
@@ -124,20 +194,28 @@ func (m *Model) updateAddMatches() {
 	if m.addCursor >= len(m.addMatches) {
 		m.addCursor = len(m.addMatches) - 1
 	}
-	if m.addCursor < -1 {
-		m.addCursor = -1
-	}
 }
 
 func (m Model) selectedWorktree() *git.Worktree {
-	if len(m.filtered) == 0 || m.cursor >= len(m.filtered) {
+	if len(m.wtFiltered) == 0 || m.wtCursor >= len(m.wtFiltered) {
 		return nil
 	}
-	idx := m.filtered[m.cursor]
+	idx := m.wtFiltered[m.wtCursor]
 	if idx >= len(m.worktrees) {
 		return nil
 	}
 	return &m.worktrees[idx]
+}
+
+func (m Model) selectedBranch() *git.Branch {
+	if len(m.brFiltered) == 0 || m.brCursor >= len(m.brFiltered) {
+		return nil
+	}
+	idx := m.brFiltered[m.brCursor]
+	if idx >= len(m.branchList) {
+		return nil
+	}
+	return &m.branchList[idx]
 }
 
 func (m Model) branchExists(name string) bool {

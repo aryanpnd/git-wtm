@@ -11,27 +11,39 @@ var (
 	cyan    = lipgloss.AdaptiveColor{Light: "#00ACC1", Dark: "#4DD0E1"}
 	dimGray = lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#626262"}
 
-	titleStyle = lipgloss.NewStyle().
+	// Header
+	logoStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
 			Background(purple).
 			Padding(0, 1)
 
-	subtitleStyle = lipgloss.NewStyle().
+	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(purple).
-			MarginBottom(1)
+			Foreground(purple)
 
+	// Tabs
+	activeTabStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(purple).
+			Padding(0, 2)
+
+	inactiveTabStyle = lipgloss.NewStyle().
+				Foreground(dimGray).
+				Padding(0, 2)
+
+	tabSeparator = lipgloss.NewStyle().
+			Foreground(dimGray)
+
+	// List items
 	itemStyle = lipgloss.NewStyle()
 
 	selectedItemStyle = lipgloss.NewStyle().
 				Foreground(purple).
 				Bold(true)
 
-	currentBadge = lipgloss.NewStyle().
-			Foreground(green).
-			Bold(true)
-
+	// Branch display
 	branchStyle = lipgloss.NewStyle().
 			Foreground(purple).
 			Bold(true)
@@ -45,6 +57,7 @@ var (
 	dimStyle = lipgloss.NewStyle().
 			Foreground(dimGray)
 
+	// Messages
 	errorStyle = lipgloss.NewStyle().
 			Foreground(red).
 			Bold(true)
@@ -56,6 +69,7 @@ var (
 	warningStyle = lipgloss.NewStyle().
 			Foreground(yellow)
 
+	// Help
 	helpStyle = lipgloss.NewStyle().
 			Foreground(dimGray)
 
@@ -63,6 +77,7 @@ var (
 			Foreground(purple).
 			Bold(true)
 
+	// Status indicators
 	statusDirty = lipgloss.NewStyle().
 			Foreground(red)
 
@@ -76,16 +91,14 @@ var (
 			Foreground(red)
 
 	// Tags
-	tagMain = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FAFAFA")).
-		Background(lipgloss.Color("#6C5CE7")).
-		Bold(true).
-		Padding(0, 1)
+	tagPrimary = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#6C5CE7")).
+			Padding(0, 1)
 
-	tagCurrent = lipgloss.NewStyle().
+	tagActive = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FAFAFA")).
 			Background(green).
-			Bold(true).
 			Padding(0, 1)
 
 	tagDetached = lipgloss.NewStyle().
@@ -93,38 +106,42 @@ var (
 			Background(red).
 			Padding(0, 1)
 
-	tagDirty = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FAFAFA")).
+	tagUnsaved = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#1a1a1a")).
 			Background(yellow).
 			Padding(0, 1)
 
 	tagClean = lipgloss.NewStyle().
 			Foreground(green)
 
-	// Worktree card
+	tagTracked = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(cyan).
+			Padding(0, 1)
+
+	tagLocal = lipgloss.NewStyle().
+			Foreground(dimGray).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(dimGray).
+			Padding(0, 1)
+
+	// Cards
 	cardBorder = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(dimGray).
-			Padding(0, 1).
-			MarginBottom(0)
+			Padding(0, 1)
 
 	cardBorderSelected = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(purple).
-				Padding(0, 1).
-				MarginBottom(0)
+				Padding(0, 1)
 
-	cardBorderCurrent = lipgloss.NewStyle().
+	cardBorderActive = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(green).
-				Padding(0, 1).
-				MarginBottom(0)
+				Padding(0, 1)
 
-	boxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(purple).
-			Padding(1, 2)
-
+	// Inputs
 	activeInputStyle = lipgloss.NewStyle().
 				Foreground(purple).
 				Bold(true)
@@ -136,6 +153,7 @@ var (
 			Foreground(purple).
 			Bold(true)
 
+	// Detail view
 	detailLabelStyle = lipgloss.NewStyle().
 				Foreground(cyan).
 				Bold(true).
@@ -146,4 +164,13 @@ var (
 
 	separatorStyle = lipgloss.NewStyle().
 			Foreground(dimGray)
+
+	boxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(purple).
+			Padding(1, 2)
+
+	subtitleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(purple)
 )
