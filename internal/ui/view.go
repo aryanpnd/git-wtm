@@ -31,38 +31,30 @@ func (m Model) View() string {
 }
 
 func (m Model) renderHeader() string {
-	logo := logoStyle.Render("git-wtm")
-	desc := dimStyle.Render(" worktree manager")
+	logo := logoStyle.Render(" git-wtm ")
 	loading := ""
 	if m.loading {
-		loading = dimStyle.Render("  ⟳")
+		loading = dimStyle.Render(" ⟳")
 	}
-	return logo + desc + loading + "\n\n"
+	return logo + loading + "\n"
 }
 
 func (m Model) renderTabs() string {
-	var tabs []string
+	wtLabel := " Worktrees "
+	brLabel := " Branches "
 
-	wtLabel := "Worktrees"
-	brLabel := "Branches"
-
+	var left, right string
 	if m.activeTab == tabWorktrees {
-		tabs = append(tabs, activeTabStyle.Render(wtLabel))
+		left = activeTabStyle.Render(wtLabel)
+		right = inactiveTabStyle.Render(brLabel)
 	} else {
-		tabs = append(tabs, inactiveTabStyle.Render(wtLabel))
+		left = inactiveTabStyle.Render(wtLabel)
+		right = activeTabStyle.Render(brLabel)
 	}
 
-	tabs = append(tabs, tabSeparator.Render("│"))
-
-	if m.activeTab == tabBranches {
-		tabs = append(tabs, activeTabStyle.Render(brLabel))
-	} else {
-		tabs = append(tabs, inactiveTabStyle.Render(brLabel))
-	}
-
-	tabBar := lipgloss.JoinHorizontal(lipgloss.Center, tabs...)
-	hint := dimStyle.Render("  ← → to switch")
-	return tabBar + hint + "\n"
+	tabBar := left + "  " + right
+	hint := dimStyle.Render("    ← → switch tabs")
+	return tabBar + hint + "\n" + separatorStyle.Render(strings.Repeat("─", min(m.width-2, 60))) + "\n"
 }
 
 // ==========================================
@@ -419,9 +411,10 @@ func (m Model) viewBrList() string {
 		s.WriteString(dimStyle.Render("  No branches found.\n"))
 	}
 
-	maxVisible := m.height - 10
-	if maxVisible < 3 {
-		maxVisible = 3
+	// Each branch item is 3 lines (name+tags, detail, blank)
+	maxVisible := (m.height - 12) / 3
+	if maxVisible < 2 {
+		maxVisible = 2
 	}
 
 	visibleStart := 0
@@ -433,16 +426,48 @@ func (m Model) viewBrList() string {
 		end = len(m.brFiltered)
 	}
 
+	// Build the list content
+	var listContent strings.Builder
 	for vi := visibleStart; vi < end; vi++ {
 		idx := m.brFiltered[vi]
 		b := m.branchList[idx]
 		isSelected := vi == m.brCursor
-		s.WriteString(m.renderBranchItem(b, isSelected))
+		listContent.WriteString(m.renderBranchItem(b, isSelected))
 	}
 
+	// Scroll indicator
+	scrollInfo := ""
 	if len(m.brFiltered) > maxVisible {
-		s.WriteString(dimStyle.Render(fmt.Sprintf("\n  ↕ %d of %d", maxVisible, len(m.brFiltered))) + "\n")
+		scrollInfo = dimStyle.Render(fmt.Sprintf(" ↕ %d of %d branches", maxVisible, len(m.brFiltered)))
+		if visibleStart > 0 {
+			scrollInfo += dimStyle.Render("  ↑ more above")
+		}
+		if end < len(m.brFiltered) {
+			scrollInfo += dimStyle.Render("  ↓ more below")
+		}
+	} else {
+		scrollInfo = dimStyle.Render(fmt.Sprintf(" %d branches", len(m.brFiltered)))
 	}
+
+	listContent.WriteString(scrollInfo)
+
+	// Wrap in a bordered box
+	listWidth := m.width - 6
+	if listWidth > 74 {
+		listWidth = 74
+	}
+	if listWidth < 40 {
+		listWidth = 40
+	}
+
+	listBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(dimGray).
+		Padding(0, 1).
+		Width(listWidth).
+		Render(listContent.String())
+
+	s.WriteString("  " + listBox + "\n")
 
 	s.WriteString(m.renderMessages())
 	s.WriteString("\n")

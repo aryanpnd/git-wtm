@@ -27,14 +27,15 @@ var (
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
 			Background(purple).
-			Padding(0, 2)
+			Padding(0, 1).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(purple)
 
 	inactiveTabStyle = lipgloss.NewStyle().
 				Foreground(dimGray).
-				Padding(0, 2)
-
-	tabSeparator = lipgloss.NewStyle().
-			Foreground(dimGray)
+				Padding(0, 1).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(dimGray)
 
 	// List items
 	itemStyle = lipgloss.NewStyle()
