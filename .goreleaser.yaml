@@ -39,7 +39,7 @@ changelog:
       - "^test:"
       - "^ci:"
 
-homebrew_casks:
+brews:
   - repository:
       owner: aryanpnd
       name: homebrew-tap
