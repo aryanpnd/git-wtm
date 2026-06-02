@@ -605,9 +605,23 @@ func (m Model) viewBrDetail() string {
 func (m Model) viewBrCreate() string {
 	var s strings.Builder
 	s.WriteString("  " + titleStyle.Render("Create Branch") + "\n\n")
-	s.WriteString(fmt.Sprintf("  %s %s\n\n", activeInputStyle.Render("Name"), m.brCreateInput.View()))
-	s.WriteString(dimStyle.Render("  Branch will be created from current HEAD") + "\n\n")
-	s.WriteString(m.renderHelpLine([]helpKey{{"enter", "create"}, {"esc", "cancel"}}))
+	s.WriteString(fmt.Sprintf("  %s %s\n\n", activeInputStyle.Render("Name   "), m.brCreateInput.View()))
+
+	// Base selector
+	s.WriteString(fmt.Sprintf("  %s ", inactiveInputStyle.Render("Base   ")))
+	for i, base := range m.brCreateBases {
+		if i == m.brCreateBaseIdx {
+			s.WriteString(tagActive.Render(" " + base + " "))
+		} else {
+			s.WriteString(dimStyle.Render(" " + base + " "))
+		}
+		if i < len(m.brCreateBases)-1 {
+			s.WriteString(dimStyle.Render("  "))
+		}
+	}
+	s.WriteString("\n\n")
+
+	s.WriteString(m.renderHelpLine([]helpKey{{"enter", "create"}, {"tab", "cycle base"}, {"esc", "cancel"}}))
 	return s.String()
 }
 

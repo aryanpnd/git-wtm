@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"sort"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -25,7 +27,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case branchDetailMsg:
+		sort.SliceStable([]git.Branch(msg), func(i, j int) bool {
+			if msg[i].IsCurrent != msg[j].IsCurrent {
+				return msg[i].IsCurrent
+			}
+			return msg[i].Name < msg[j].Name
+		})
 		m.branchList = msg
+		m.brCreateBases = buildCreateBases(msg)
 		m.loading = false
 		m.applyBrFilter()
 		return m, nil
@@ -476,6 +485,7 @@ func (m Model) updateBrList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.brView = viewBranchCreate
 		m.brCreateInput.Reset()
 		m.brCreateInput.Focus()
+		m.brCreateBaseIdx = 0
 		m.statusMsg = ""
 		m.err = nil
 		return m, textinput.Blink
@@ -563,18 +573,31 @@ func (m Model) updateBrCreate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.brView = viewList
 		return m, nil
+	case "tab":
+		if len(m.brCreateBases) > 0 {
+			m.brCreateBaseIdx = (m.brCreateBaseIdx + 1) % len(m.brCreateBases)
+		}
+		return m, nil
 	case "enter":
 		name := m.brCreateInput.Value()
 		if name == "" {
 			return m, nil
 		}
+		base := ""
+		if len(m.brCreateBases) > 0 && m.brCreateBaseIdx > 0 {
+			base = m.brCreateBases[m.brCreateBaseIdx]
+		}
 		m.brView = viewList
 		m.loading = true
 		return m, func() tea.Msg {
-			if err := git.CreateBranch(name, ""); err != nil {
+			if err := git.CreateBranch(name, base); err != nil {
 				return errMsg{err}
 			}
-			return statusMsg("Created branch: " + name)
+			from := "HEAD"
+			if base != "" {
+				from = base
+			}
+			return statusMsg("Created branch: " + name + " (from " + from + ")")
 		}
 	default:
 		var cmd tea.Cmd

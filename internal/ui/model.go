@@ -60,15 +60,17 @@ type Model struct {
 	confirmForce bool
 
 	// Branches tab
-	branchList     []git.Branch
-	brFiltered     []int
-	brCursor       int
-	brView         view
-	brSearch       textinput.Model
-	brSearching    bool
-	brCreateInput  textinput.Model
-	brRenameInput  textinput.Model
-	brDeleteForce  bool
+	branchList      []git.Branch
+	brFiltered      []int
+	brCursor        int
+	brView          view
+	brSearch        textinput.Model
+	brSearching     bool
+	brCreateInput   textinput.Model
+	brRenameInput   textinput.Model
+	brDeleteForce   bool
+	brCreateBaseIdx int    // index into brCreateBases
+	brCreateBases   []string
 }
 
 type worktreeListMsg []git.Worktree
@@ -228,6 +230,18 @@ func (m Model) selectedBranch() *git.Branch {
 		return nil
 	}
 	return &m.branchList[idx]
+}
+
+// buildCreateBases returns the list of base options for branch creation:
+// "current HEAD" always first, then main/master if they exist.
+func buildCreateBases(branches []git.Branch) []string {
+	bases := []string{"current HEAD"}
+	for _, b := range branches {
+		if b.Name == "main" || b.Name == "master" {
+			bases = append(bases, b.Name)
+		}
+	}
+	return bases
 }
 
 func (m Model) branchExists(name string) bool {
