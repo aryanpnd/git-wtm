@@ -15,18 +15,22 @@ var (
 	logoStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(purple).
+			Background(lipgloss.Color("#2D9C6F")).
 			Padding(0, 1)
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(purple)
+			Foreground(lipgloss.AdaptiveColor{Light: "#2D9C6F", Dark: "#73F59F"})
+
+	loadingStyle = lipgloss.NewStyle().
+			Foreground(yellow).
+			Bold(true)
 
 	// Tabs
 	activeTabStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(purple).
+			Background(lipgloss.Color("#45475A")).
 			Padding(0, 1)
 
 	inactiveTabStyle = lipgloss.NewStyle().

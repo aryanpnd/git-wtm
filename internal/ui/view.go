@@ -29,14 +29,12 @@ func (m Model) View() string {
 }
 
 func (m Model) renderHeader() string {
-	logo := logoStyle.Render(" git-wtm ")
-	subtitle := dimStyle.Render(" Git Worktree Manager")
 	loading := ""
 	if m.loading {
-		loading = dimStyle.Render("  ⟳")
+		loading = "  " + loadingStyle.Render("● loading...")
 	}
 
-	titleLine := logo + subtitle + loading
+	titleLine := logoStyle.Render(" 🌳 git-wtm ") + titleStyle.Render(" Worktree Manager ") + loading
 
 	wtLabel := " Worktrees "
 	brLabel := " Branches "
