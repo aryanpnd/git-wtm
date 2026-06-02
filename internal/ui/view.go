@@ -31,10 +31,20 @@ func (m Model) View() string {
 func (m Model) renderHeader() string {
 	loading := ""
 	if m.loading {
-		loading = "  " + loadingStyle.Render("● loading...")
+		loading = loadingStyle.Render("  ● loading...")
 	}
 
-	titleLine := logoStyle.Render("  🌳 git-wtm  ") + "  " + titleStyle.Render("Worktree & Branch Manager") + loading
+	width := min(m.width-2, 70)
+	title := "🌳 git-wtm"
+	subtitle := "Worktree & Branch Manager"
+	pad := width - len(title) - len(subtitle) - 4
+	if pad < 2 {
+		pad = 2
+	}
+
+	titleLine := logoStyle.Width(width).Render(
+		"  " + title + strings.Repeat(" ", pad) + subtitle + "  ",
+	) + loading
 
 	wtLabel := " Worktrees "
 	brLabel := " Branches "

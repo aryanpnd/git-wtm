@@ -16,7 +16,8 @@ var (
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
 			Background(lipgloss.Color("#2D9C6F")).
-			Padding(0, 1)
+			Padding(0, 0).
+			MarginBottom(1)
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
