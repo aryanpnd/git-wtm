@@ -23,6 +23,7 @@ type Worktree struct {
 	IsBare     bool
 	IsDetached bool
 	IsCurrent  bool
+	IsPrimary  bool
 	Status     WorktreeStatus
 	Ahead      int
 	Behind     int
@@ -118,6 +119,9 @@ func ListWorktrees() ([]Worktree, error) {
 			if current.Path != "" {
 				if current.Branch == currentBranch && current.Path == repoRoot {
 					current.IsCurrent = true
+				}
+				if len(worktrees) == 0 {
+					current.IsPrimary = true
 				}
 				current.Status = GetWorktreeStatus(current.Path)
 				if current.Branch != "" && current.Branch != "(detached)" {

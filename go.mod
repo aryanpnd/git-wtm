@@ -1,4 +1,4 @@
-module github.com/aryan/worktree-manager
+module github.com/aryanpnd/git-wtm
 
 go 1.26.3
 

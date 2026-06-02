@@ -3,12 +3,11 @@ package ui
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/aryan/worktree-manager/internal/git"
+	"github.com/aryanpnd/git-wtm/internal/git"
 )
 
 func (m Model) View() string {
@@ -25,8 +24,6 @@ func (m Model) View() string {
 		s.WriteString(m.viewAdd())
 	case viewRemoveConfirm:
 		s.WriteString(m.viewRemoveConfirm())
-	case viewBranchSelect:
-		s.WriteString(m.viewBranchSelect())
 	case viewDetail:
 		s.WriteString(m.viewDetail())
 	}
@@ -41,45 +38,56 @@ func (m Model) viewList() string {
 	if m.loading {
 		header += dimStyle.Render("  ⟳ loading...")
 	}
-	s.WriteString(header + "\n")
+	count := dimStyle.Render(fmt.Sprintf("  %d worktrees", len(m.worktrees)))
+	s.WriteString(header + count + "\n\n")
 
 	if m.searching {
-		s.WriteString("  " + searchStyle.Render("/") + " " + m.searchInput.View() + "\n\n")
+		s.WriteString("  " + searchStyle.Render("🔍 ") + m.searchInput.View() + "\n\n")
 	} else if m.searchInput.Value() != "" {
 		s.WriteString("  " + dimStyle.Render(fmt.Sprintf("filter: %q (%d results)", m.searchInput.Value(), len(m.filtered))) + "\n\n")
-	} else {
-		s.WriteString("\n")
 	}
 
 	if len(m.worktrees) == 0 && !m.loading {
 		s.WriteString(dimStyle.Render("  No worktrees found. Press 'a' to add one.\n"))
 	}
 
-	maxVisible := m.height - 12
-	if maxVisible < 3 {
-		maxVisible = 3
+	maxVisible := m.height - 10
+	if maxVisible < 2 {
+		maxVisible = 2
+	}
+	// Each card takes ~4 lines, so divide available space
+	maxCards := maxVisible / 4
+	if maxCards < 1 {
+		maxCards = 1
 	}
 
 	visibleStart := 0
-	if m.cursor >= maxVisible {
-		visibleStart = m.cursor - maxVisible + 1
+	if m.cursor >= maxCards {
+		visibleStart = m.cursor - maxCards + 1
 	}
 
-	end := visibleStart + maxVisible
+	end := visibleStart + maxCards
 	if end > len(m.filtered) {
 		end = len(m.filtered)
+	}
+
+	cardWidth := m.width - 4
+	if cardWidth > 80 {
+		cardWidth = 80
+	}
+	if cardWidth < 40 {
+		cardWidth = 40
 	}
 
 	for vi := visibleStart; vi < end; vi++ {
 		idx := m.filtered[vi]
 		wt := m.worktrees[idx]
-
 		isSelected := vi == m.cursor
-		s.WriteString(m.renderWorktreeItem(wt, isSelected))
+		s.WriteString(m.renderWorktreeCard(wt, isSelected, cardWidth))
 	}
 
-	if len(m.filtered) > maxVisible {
-		s.WriteString(dimStyle.Render(fmt.Sprintf("  ↕ %d/%d shown\n", maxVisible, len(m.filtered))))
+	if len(m.filtered) > maxCards {
+		s.WriteString(dimStyle.Render(fmt.Sprintf("  ↕ showing %d of %d", maxCards, len(m.filtered))) + "\n")
 	}
 
 	if m.statusMsg != "" {
@@ -99,110 +107,200 @@ func (m Model) viewList() string {
 	return s.String()
 }
 
-func (m Model) renderWorktreeItem(wt git.Worktree, selected bool) string {
-	var s strings.Builder
-
-	cursor := "  "
-	nameStyle := itemStyle
-	if selected {
-		cursor = "▸ "
-		nameStyle = selectedItemStyle
+func (m Model) renderWorktreeCard(wt git.Worktree, selected bool, width int) string {
+	// Build tags
+	var tags []string
+	if wt.IsPrimary {
+		tags = append(tags, tagMain.Render("PRIMARY"))
 	}
-
-	name := filepath.Base(wt.Path)
-	branch := branchStyle.Render(wt.Branch)
 	if wt.IsCurrent {
-		branch = currentBadge.Render(wt.Branch + " ●")
+		tags = append(tags, tagCurrent.Render("ACTIVE"))
 	}
-
-	statusIndicator := statusClean.Render("✓")
+	if wt.IsDetached {
+		tags = append(tags, tagDetached.Render("DETACHED"))
+	}
 	if wt.Status.IsDirty {
-		parts := []string{}
-		if wt.Status.Modified > 0 {
-			parts = append(parts, fmt.Sprintf("~%d", wt.Status.Modified))
-		}
-		if wt.Status.Added > 0 {
-			parts = append(parts, fmt.Sprintf("+%d", wt.Status.Added))
-		}
-		if wt.Status.Deleted > 0 {
-			parts = append(parts, fmt.Sprintf("-%d", wt.Status.Deleted))
-		}
-		if wt.Status.Untracked > 0 {
-			parts = append(parts, fmt.Sprintf("?%d", wt.Status.Untracked))
-		}
-		statusIndicator = statusDirty.Render(strings.Join(parts, " "))
+		tags = append(tags, tagDirty.Render("UNSAVED CHANGES"))
+	} else {
+		tags = append(tags, tagClean.Render("✓ clean"))
 	}
 
-	syncInfo := ""
+	// Line 1: branch + tags
+	branchDisplay := branchStyle.Render(" " + wt.Branch)
+	tagLine := strings.Join(tags, " ")
+	line1 := branchDisplay + "  " + tagLine
+
+	// Line 2: status details with labels
+	var statusParts []string
+	if wt.Status.Modified > 0 {
+		statusParts = append(statusParts, warningStyle.Render(fmt.Sprintf("%d modified", wt.Status.Modified)))
+	}
+	if wt.Status.Added > 0 {
+		statusParts = append(statusParts, successStyle.Render(fmt.Sprintf("%d added", wt.Status.Added)))
+	}
+	if wt.Status.Deleted > 0 {
+		statusParts = append(statusParts, errorStyle.Render(fmt.Sprintf("%d deleted", wt.Status.Deleted)))
+	}
+	if wt.Status.Untracked > 0 {
+		statusParts = append(statusParts, dimStyle.Render(fmt.Sprintf("%d untracked", wt.Status.Untracked)))
+	}
+
+	syncParts := ""
 	if wt.Ahead > 0 {
-		syncInfo += aheadStyle.Render(fmt.Sprintf("↑%d", wt.Ahead))
+		syncParts += aheadStyle.Render(fmt.Sprintf("↑ %d ahead", wt.Ahead))
 	}
 	if wt.Behind > 0 {
-		if syncInfo != "" {
-			syncInfo += " "
+		if syncParts != "" {
+			syncParts += "  "
 		}
-		syncInfo += behindStyle.Render(fmt.Sprintf("↓%d", wt.Behind))
+		syncParts += behindStyle.Render(fmt.Sprintf("↓ %d behind", wt.Behind))
 	}
 
-	line1 := fmt.Sprintf("%s%s  %s  %s  %s",
-		cursor,
-		nameStyle.Render(name),
-		branch,
-		statusIndicator,
-		syncInfo,
-	)
+	line2 := ""
+	if len(statusParts) > 0 || syncParts != "" {
+		line2 = " " + strings.Join(statusParts, " ")
+		if syncParts != "" {
+			if line2 != " " {
+				line2 += "  "
+			}
+			line2 += syncParts
+		}
+	}
 
-	commit := commitStyle.Render(wt.Head)
+	// Line 3: commit + message
 	lastMsg := git.GetLastCommitMessage(wt.Path)
-	if len(lastMsg) > 50 {
-		lastMsg = lastMsg[:47] + "..."
+	if len(lastMsg) > 45 {
+		lastMsg = lastMsg[:42] + "..."
 	}
-	line2 := fmt.Sprintf("     %s %s  %s",
-		commit,
-		dimStyle.Render(lastMsg),
-		pathStyle.Render(shortenPath(wt.Path)),
-	)
+	line3 := " " + dimStyle.Render("commit ") + commitStyle.Render(wt.Head) + " " + dimStyle.Render(lastMsg)
 
-	s.WriteString(line1 + "\n")
-	s.WriteString(line2 + "\n\n")
+	// Line 4: path
+	line4 := " " + dimStyle.Render("path   ") + pathStyle.Render(shortenPath(wt.Path))
 
-	return s.String()
+	// Compose card content
+	content := line1
+	if line2 != "" && line2 != " " {
+		content += "\n" + line2
+	}
+	content += "\n" + line3
+	content += "\n" + line4
+
+	// Choose border style
+	border := cardBorder
+	if selected && wt.IsCurrent {
+		border = cardBorderCurrent.Width(width)
+	} else if selected {
+		border = cardBorderSelected.Width(width)
+	} else if wt.IsCurrent {
+		border = cardBorderCurrent.Width(width)
+	} else {
+		border = cardBorder.Width(width)
+	}
+
+	// Cursor indicator
+	cursor := "  "
+	if selected {
+		cursor = "▸ "
+	}
+
+	card := border.Render(content)
+
+	// Prepend cursor to first line of card
+	lines := strings.Split(card, "\n")
+	if len(lines) > 0 {
+		lines[0] = cursor + lines[0]
+		for i := 1; i < len(lines); i++ {
+			lines[i] = "  " + lines[i]
+		}
+	}
+
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func (m Model) viewAdd() string {
 	var s strings.Builder
 
-	mode := "existing branch"
-	if m.createNew {
-		mode = "new branch"
-	}
-	s.WriteString(titleStyle.Render(" Add Worktree ") + "  " + dimStyle.Render("("+mode+")") + "\n\n")
+	s.WriteString(titleStyle.Render(" Add Worktree ") + "\n\n")
 
-	branchLabel := inactiveInputStyle.Render("  Branch ")
+	// Branch input
+	branchLabel := activeInputStyle.Render("  Branch ")
 	pathLabel := inactiveInputStyle.Render("  Path   ")
-	if m.addStep == 0 {
-		branchLabel = activeInputStyle.Render("▸ Branch ")
-	} else {
-		pathLabel = activeInputStyle.Render("▸ Path   ")
+	if m.addStep == 1 {
+		branchLabel = inactiveInputStyle.Render("  Branch ")
+		pathLabel = activeInputStyle.Render("  Path   ")
 	}
 
-	s.WriteString(fmt.Sprintf("%s %s\n\n", branchLabel, m.branchInput.View()))
-	s.WriteString(fmt.Sprintf("%s %s\n", pathLabel, m.pathInput.View()))
+	s.WriteString(fmt.Sprintf("%s %s\n", branchLabel, m.branchInput.View()))
 
-	defaultPath := ""
-	if m.branchInput.Value() != "" {
-		defaultPath = git.DefaultWorktreePath(m.branchInput.Value())
+	// Matching branches dropdown
+	if m.addStep == 0 && len(m.addMatches) > 0 {
+		maxShow := 6
+		if maxShow > len(m.addMatches) {
+			maxShow = len(m.addMatches)
+		}
+
+		var dropdownLines []string
+		for i := 0; i < maxShow; i++ {
+			prefix := "  "
+			style := dimStyle
+			if i == m.addCursor {
+				prefix = "▸ "
+				style = selectedItemStyle
+			}
+			dropdownLines = append(dropdownLines, prefix+style.Render(m.addMatches[i]))
+		}
+		if len(m.addMatches) > maxShow {
+			dropdownLines = append(dropdownLines, dimStyle.Render(fmt.Sprintf("  ... %d more", len(m.addMatches)-maxShow)))
+		}
+
+		dropdown := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(dimGray).
+			Padding(0, 1).
+			MarginLeft(11).
+			Render(strings.Join(dropdownLines, "\n"))
+
+		s.WriteString(dropdown + "\n")
 	}
-	if defaultPath != "" && m.pathInput.Value() == "" {
-		s.WriteString(dimStyle.Render(fmt.Sprintf("         default: %s", shortenPath(defaultPath))) + "\n")
+
+	// "New branch" hint
+	if m.addStep == 0 && m.branchInput.Value() != "" && len(m.addMatches) == 0 {
+		hint := lipgloss.NewStyle().
+			MarginLeft(11).
+			Foreground(green).
+			Bold(true).
+			Render("+ new branch will be created")
+		s.WriteString("\n" + hint + "\n")
 	}
 
 	s.WriteString("\n")
-	s.WriteString(m.renderHelpLine([]helpKey{
-		{"enter", "confirm"},
-		{"tab", "switch field"},
+	s.WriteString(fmt.Sprintf("%s %s\n", pathLabel, m.pathInput.View()))
+
+	// Default path hint
+	branchVal := m.branchInput.Value()
+	if m.addCursor >= 0 && m.addCursor < len(m.addMatches) {
+		branchVal = m.addMatches[m.addCursor]
+	}
+	if branchVal != "" {
+		defaultPath := git.DefaultWorktreePath(branchVal)
+		s.WriteString(dimStyle.Render(fmt.Sprintf("           → %s", shortenPath(defaultPath))) + "\n")
+	}
+
+	s.WriteString("\n")
+	helpKeys := []helpKey{
+		{"enter", "create"},
+		{"↑/↓", "pick branch"},
+		{"tab", "edit path"},
 		{"esc", "cancel"},
-	}))
+	}
+	if m.addStep == 1 {
+		helpKeys = []helpKey{
+			{"enter", "create"},
+			{"tab", "back to branch"},
+			{"esc", "back"},
+		}
+	}
+	s.WriteString(m.renderHelpLine(helpKeys))
 
 	return s.String()
 }
@@ -218,75 +316,25 @@ func (m Model) viewRemoveConfirm() string {
 		return s.String()
 	}
 
-	s.WriteString(fmt.Sprintf("  %s %s\n\n", detailLabelStyle.Render("Path:"), errorStyle.Render(wt.Path)))
-	s.WriteString(fmt.Sprintf("  %s %s\n\n", detailLabelStyle.Render("Branch:"), branchStyle.Render(wt.Branch)))
+	content := fmt.Sprintf("%s %s\n\n", detailLabelStyle.Render("Path:"), errorStyle.Render(shortenPath(wt.Path)))
+	content += fmt.Sprintf("%s %s\n", detailLabelStyle.Render("Branch:"), branchStyle.Render(wt.Branch))
 
 	if wt.Status.IsDirty {
-		s.WriteString(warningStyle.Render("  ⚠ This worktree has uncommitted changes!") + "\n\n")
+		content += "\n" + warningStyle.Render("⚠ This worktree has uncommitted changes!")
 	}
 
 	forceLabel := dimStyle.Render("off")
 	if m.confirmForce {
 		forceLabel = errorStyle.Render("ON")
 	}
-	s.WriteString(fmt.Sprintf("  %s %s\n\n", detailLabelStyle.Render("Force:"), forceLabel))
+	content += fmt.Sprintf("\n\n%s %s", detailLabelStyle.Render("Force:"), forceLabel)
+
+	s.WriteString(boxStyle.Render(content) + "\n\n")
 
 	s.WriteString(m.renderHelpLine([]helpKey{
 		{"y", "confirm"},
 		{"n/esc", "cancel"},
 		{"f", "toggle force"},
-	}))
-
-	return s.String()
-}
-
-func (m Model) viewBranchSelect() string {
-	var s strings.Builder
-
-	s.WriteString(titleStyle.Render(" Select Branch ") + "\n\n")
-	s.WriteString("  " + m.branchSearch.View() + "\n\n")
-
-	if len(m.filteredBranch) == 0 {
-		s.WriteString(dimStyle.Render("  No matching branches.\n"))
-	}
-
-	maxVisible := m.height - 10
-	if maxVisible < 5 {
-		maxVisible = 5
-	}
-
-	visibleStart := 0
-	if m.branchCursor >= visibleStart+maxVisible {
-		visibleStart = m.branchCursor - maxVisible + 1
-	}
-
-	end := visibleStart + maxVisible
-	if end > len(m.filteredBranch) {
-		end = len(m.filteredBranch)
-	}
-
-	for vi := visibleStart; vi < end; vi++ {
-		idx := m.filteredBranch[vi]
-		branch := m.branches[idx]
-
-		cursor := "  "
-		style := itemStyle
-		if vi == m.branchCursor {
-			cursor = "▸ "
-			style = selectedItemStyle
-		}
-		s.WriteString(fmt.Sprintf("%s%s\n", cursor, style.Render(branch)))
-	}
-
-	if len(m.filteredBranch) > maxVisible {
-		s.WriteString(dimStyle.Render(fmt.Sprintf("\n  %d/%d branches", maxVisible, len(m.filteredBranch))))
-	}
-
-	s.WriteString("\n\n")
-	s.WriteString(m.renderHelpLine([]helpKey{
-		{"enter", "select"},
-		{"↑/↓", "navigate"},
-		{"esc", "cancel"},
 	}))
 
 	return s.String()
@@ -303,6 +351,21 @@ func (m Model) viewDetail() string {
 
 	s.WriteString(titleStyle.Render(" Worktree Details ") + "\n\n")
 
+	// Tags
+	var tags []string
+	if wt.IsPrimary {
+		tags = append(tags, tagMain.Render("PRIMARY"))
+	}
+	if wt.IsCurrent {
+		tags = append(tags, tagCurrent.Render("ACTIVE"))
+	}
+	if wt.IsDetached {
+		tags = append(tags, tagDetached.Render("DETACHED"))
+	}
+	if len(tags) > 0 {
+		s.WriteString("  " + strings.Join(tags, " ") + "\n\n")
+	}
+
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Branch:"), branchStyle.Render(wt.Branch)))
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Path:"), detailValueStyle.Render(wt.Path)))
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("HEAD:"), commitStyle.Render(wt.Head)))
@@ -312,7 +375,7 @@ func (m Model) viewDetail() string {
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Commit:"), detailValueStyle.Render(lastMsg)))
 	s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Time:"), dimStyle.Render(lastTime)))
 
-	s.WriteString("\n")
+	s.WriteString("\n  " + separatorStyle.Render(strings.Repeat("─", 40)) + "\n\n")
 
 	statusLabel := statusClean.Render("Clean ✓")
 	if wt.Status.IsDirty {
@@ -338,15 +401,11 @@ func (m Model) viewDetail() string {
 	if wt.Ahead > 0 || wt.Behind > 0 {
 		s.WriteString("\n")
 		if wt.Ahead > 0 {
-			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Ahead:"), aheadStyle.Render(fmt.Sprintf("%d commits", wt.Ahead))))
+			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Ahead:"), aheadStyle.Render(fmt.Sprintf("↑ %d commits", wt.Ahead))))
 		}
 		if wt.Behind > 0 {
-			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Behind:"), behindStyle.Render(fmt.Sprintf("%d commits", wt.Behind))))
+			s.WriteString(fmt.Sprintf("  %s %s\n", detailLabelStyle.Render("Behind:"), behindStyle.Render(fmt.Sprintf("↓ %d commits", wt.Behind))))
 		}
-	}
-
-	if wt.IsCurrent {
-		s.WriteString("\n  " + currentBadge.Render("● Current worktree") + "\n")
 	}
 
 	s.WriteString("\n")
@@ -376,10 +435,9 @@ func (m Model) renderHelpLine(keys []helpKey) string {
 func (m Model) shortHelp() string {
 	return m.renderHelpLine([]helpKey{
 		{"a", "add"},
-		{"n", "new"},
-		{"b", "branches"},
 		{"/", "search"},
 		{"d", "remove"},
+		{"r", "refresh"},
 		{"enter", "details"},
 		{"?", "help"},
 		{"q", "quit"},
@@ -402,9 +460,7 @@ func (m Model) fullHelp() string {
 			{"/", "search/filter"},
 		}},
 		{"Actions", []helpKey{
-			{"a", "add worktree (existing branch)"},
-			{"n", "add worktree (new branch)"},
-			{"b", "browse & select branch"},
+			{"a", "add worktree (type to search or create)"},
 			{"d", "remove worktree"},
 			{"p", "prune stale worktrees"},
 		}},

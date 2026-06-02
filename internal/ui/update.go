@@ -4,7 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/aryan/worktree-manager/internal/git"
+	"github.com/aryanpnd/git-wtm/internal/git"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -22,7 +22,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case branchListMsg:
 		m.branches = msg
-		m.applyBranchFilter()
 		return m, nil
 
 	case errMsg:
@@ -51,8 +50,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateAdd(msg)
 		case viewRemoveConfirm:
 			return m.updateRemoveConfirm(msg)
-		case viewBranchSelect:
-			return m.updateBranchSelect(msg)
 		case viewDetail:
 			return m.updateDetail(msg)
 		}
@@ -97,35 +94,17 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searching = true
 		m.searchInput.Focus()
 		return m, textinput.Blink
-	case "a":
+	case "a", "n":
 		m.currentView = viewAdd
 		m.addStep = 0
-		m.createNew = false
 		m.branchInput.Reset()
 		m.pathInput.Reset()
 		m.branchInput.Focus()
+		m.addMatches = nil
+		m.addCursor = -1
 		m.statusMsg = ""
 		m.err = nil
 		return m, textinput.Blink
-	case "n":
-		m.currentView = viewAdd
-		m.addStep = 0
-		m.createNew = true
-		m.branchInput.Reset()
-		m.pathInput.Reset()
-		m.branchInput.Focus()
-		m.statusMsg = ""
-		m.err = nil
-		return m, textinput.Blink
-	case "b":
-		m.currentView = viewBranchSelect
-		m.branchCursor = 0
-		m.branchSearch.Reset()
-		m.branchSearch.Focus()
-		m.applyBranchFilter()
-		m.statusMsg = ""
-		m.err = nil
-		return m, tea.Batch(fetchBranches, textinput.Blink)
 	case "d", "x":
 		wt := m.selectedWorktree()
 		if wt != nil && !wt.IsCurrent {
@@ -191,24 +170,38 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.currentView = viewList
-		return m, nil
-	case "enter":
-		if m.addStep == 0 {
-			if m.branchInput.Value() == "" {
-				return m, nil
-			}
+	if m.addStep == 0 {
+		switch msg.String() {
+		case "esc":
+			m.currentView = viewList
+			return m, nil
+		case "tab":
 			m.addStep = 1
 			m.branchInput.Blur()
 			m.pathInput.Focus()
 			return m, textinput.Blink
-		}
-		if m.addStep == 1 {
+		case "up", "ctrl+p":
+			if m.addCursor > 0 {
+				m.addCursor--
+			} else if m.addCursor == 0 {
+				m.addCursor = -1
+			}
+			return m, nil
+		case "down", "ctrl+n":
+			if m.addCursor < len(m.addMatches)-1 {
+				m.addCursor++
+			}
+			return m, nil
+		case "enter":
 			branch := m.branchInput.Value()
+			if m.addCursor >= 0 && m.addCursor < len(m.addMatches) {
+				branch = m.addMatches[m.addCursor]
+			}
+			if branch == "" {
+				return m, nil
+			}
 			path := m.pathInput.Value()
-			createNew := m.createNew
+			createNew := !m.branchExists(branch)
 			m.currentView = viewList
 			m.loading = true
 			return m, func() tea.Msg {
@@ -219,29 +212,64 @@ func (m Model) updateAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if displayPath == "" {
 					displayPath = git.DefaultWorktreePath(branch)
 				}
-				return statusMsg("Created worktree: " + displayPath)
+				action := "Checked out"
+				if createNew {
+					action = "Created"
+				}
+				return statusMsg(action + " branch → " + displayPath)
 			}
+		default:
+			var cmd tea.Cmd
+			m.branchInput, cmd = m.branchInput.Update(msg)
+			m.addCursor = -1
+			m.updateAddMatches()
+			return m, cmd
 		}
-	case "tab", "shift+tab":
-		if m.addStep == 0 {
-			m.addStep = 1
-			m.branchInput.Blur()
-			m.pathInput.Focus()
-			return m, textinput.Blink
-		}
-		m.addStep = 0
-		m.pathInput.Blur()
-		m.branchInput.Focus()
-		return m, textinput.Blink
 	}
 
-	var cmd tea.Cmd
-	if m.addStep == 0 {
-		m.branchInput, cmd = m.branchInput.Update(msg)
-	} else {
-		m.pathInput, cmd = m.pathInput.Update(msg)
+	if m.addStep == 1 {
+		switch msg.String() {
+		case "esc", "shift+tab":
+			m.addStep = 0
+			m.pathInput.Blur()
+			m.branchInput.Focus()
+			return m, textinput.Blink
+		case "tab":
+			m.addStep = 0
+			m.pathInput.Blur()
+			m.branchInput.Focus()
+			return m, textinput.Blink
+		case "enter":
+			branch := m.branchInput.Value()
+			if branch == "" {
+				return m, nil
+			}
+			path := m.pathInput.Value()
+			createNew := !m.branchExists(branch)
+			m.currentView = viewList
+			m.loading = true
+			return m, func() tea.Msg {
+				if err := git.AddWorktree(path, branch, createNew); err != nil {
+					return errMsg{err}
+				}
+				displayPath := path
+				if displayPath == "" {
+					displayPath = git.DefaultWorktreePath(branch)
+				}
+				action := "Checked out"
+				if createNew {
+					action = "Created"
+				}
+				return statusMsg(action + " branch → " + displayPath)
+			}
+		default:
+			var cmd tea.Cmd
+			m.pathInput, cmd = m.pathInput.Update(msg)
+			return m, cmd
+		}
 	}
-	return m, cmd
+
+	return m, nil
 }
 
 func (m Model) updateRemoveConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -266,42 +294,6 @@ func (m Model) updateRemoveConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "f":
 		m.confirmForce = !m.confirmForce
-	}
-	return m, nil
-}
-
-func (m Model) updateBranchSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.currentView = viewList
-		m.branchSearch.Blur()
-		return m, nil
-	case "up", "ctrl+p":
-		if m.branchCursor > 0 {
-			m.branchCursor--
-		}
-	case "down", "ctrl+n":
-		if m.branchCursor < len(m.filteredBranch)-1 {
-			m.branchCursor++
-		}
-	case "enter":
-		if len(m.filteredBranch) > 0 && m.branchCursor < len(m.filteredBranch) {
-			branch := m.branches[m.filteredBranch[m.branchCursor]]
-			m.currentView = viewAdd
-			m.addStep = 1
-			m.createNew = false
-			m.branchInput.SetValue(branch)
-			m.pathInput.Reset()
-			m.branchInput.Blur()
-			m.branchSearch.Blur()
-			m.pathInput.Focus()
-			return m, textinput.Blink
-		}
-	default:
-		var cmd tea.Cmd
-		m.branchSearch, cmd = m.branchSearch.Update(msg)
-		m.applyBranchFilter()
-		return m, cmd
 	}
 	return m, nil
 }

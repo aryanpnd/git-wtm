@@ -8,25 +8,23 @@ var (
 	red     = lipgloss.AdaptiveColor{Light: "#FF6347", Dark: "#FF6347"}
 	yellow  = lipgloss.AdaptiveColor{Light: "#FFBF00", Dark: "#FFD700"}
 	blue    = lipgloss.AdaptiveColor{Light: "#5B9BD5", Dark: "#89CFF0"}
+	cyan    = lipgloss.AdaptiveColor{Light: "#00ACC1", Dark: "#4DD0E1"}
 	dimGray = lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#626262"}
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
 			Background(purple).
-			Padding(0, 1).
-			MarginBottom(1)
+			Padding(0, 1)
 
 	subtitleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(purple).
 			MarginBottom(1)
 
-	itemStyle = lipgloss.NewStyle().
-			PaddingLeft(2)
+	itemStyle = lipgloss.NewStyle()
 
 	selectedItemStyle = lipgloss.NewStyle().
-				PaddingLeft(1).
 				Foreground(purple).
 				Bold(true)
 
@@ -35,7 +33,8 @@ var (
 			Bold(true)
 
 	branchStyle = lipgloss.NewStyle().
-			Foreground(purple)
+			Foreground(purple).
+			Bold(true)
 
 	commitStyle = lipgloss.NewStyle().
 			Foreground(yellow)
@@ -76,6 +75,51 @@ var (
 	behindStyle = lipgloss.NewStyle().
 			Foreground(red)
 
+	// Tags
+	tagMain = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Background(lipgloss.Color("#6C5CE7")).
+		Bold(true).
+		Padding(0, 1)
+
+	tagCurrent = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(green).
+			Bold(true).
+			Padding(0, 1)
+
+	tagDetached = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(red).
+			Padding(0, 1)
+
+	tagDirty = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(yellow).
+			Padding(0, 1)
+
+	tagClean = lipgloss.NewStyle().
+			Foreground(green)
+
+	// Worktree card
+	cardBorder = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(dimGray).
+			Padding(0, 1).
+			MarginBottom(0)
+
+	cardBorderSelected = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(purple).
+				Padding(0, 1).
+				MarginBottom(0)
+
+	cardBorderCurrent = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(green).
+				Padding(0, 1).
+				MarginBottom(0)
+
 	boxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(purple).
@@ -93,10 +137,13 @@ var (
 			Bold(true)
 
 	detailLabelStyle = lipgloss.NewStyle().
-				Foreground(purple).
+				Foreground(cyan).
 				Bold(true).
 				Width(12)
 
 	detailValueStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Light: "#333333", Dark: "#DDDDDD"})
+
+	separatorStyle = lipgloss.NewStyle().
+			Foreground(dimGray)
 )

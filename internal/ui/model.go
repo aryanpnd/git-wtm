@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/aryan/worktree-manager/internal/git"
+	"github.com/aryanpnd/git-wtm/internal/git"
 )
 
 type view int
@@ -15,32 +15,29 @@ const (
 	viewList view = iota
 	viewAdd
 	viewRemoveConfirm
-	viewBranchSelect
 	viewDetail
 )
 
 type Model struct {
-	worktrees      []git.Worktree
-	filtered       []int
-	branches       []string
-	filteredBranch []int
-	cursor         int
-	currentView    view
-	width          int
-	height         int
-	err            error
-	statusMsg      string
-	pathInput      textinput.Model
-	branchInput    textinput.Model
-	searchInput    textinput.Model
-	branchSearch   textinput.Model
-	addStep        int
-	createNew      bool
-	branchCursor   int
-	confirmForce   bool
-	searching      bool
-	loading        bool
-	showHelp       bool
+	worktrees    []git.Worktree
+	filtered     []int
+	branches     []string
+	cursor       int
+	currentView  view
+	width        int
+	height       int
+	err          error
+	statusMsg    string
+	pathInput    textinput.Model
+	branchInput  textinput.Model
+	searchInput  textinput.Model
+	addStep      int // 0=branch, 1=path
+	addMatches   []string
+	addCursor    int
+	confirmForce bool
+	searching    bool
+	loading      bool
+	showHelp     bool
 }
 
 type worktreeListMsg []git.Worktree
@@ -57,23 +54,19 @@ func NewModel() Model {
 	pi.CharLimit = 200
 
 	bi := textinput.New()
-	bi.Placeholder = "branch-name"
+	bi.Placeholder = "type branch name..."
 	bi.CharLimit = 100
 
 	si := textinput.New()
 	si.Placeholder = "type to filter..."
 	si.CharLimit = 100
 
-	bs := textinput.New()
-	bs.Placeholder = "search branches..."
-	bs.CharLimit = 100
-
 	return Model{
-		currentView:  viewList,
-		pathInput:    pi,
-		branchInput:  bi,
-		searchInput:  si,
-		branchSearch: bs,
+		currentView: viewList,
+		pathInput:   pi,
+		branchInput: bi,
+		searchInput: si,
+		addCursor:   -1,
 	}
 }
 
@@ -116,16 +109,23 @@ func (m *Model) applyFilter() {
 	}
 }
 
-func (m *Model) applyBranchFilter() {
-	query := strings.ToLower(m.branchSearch.Value())
-	m.filteredBranch = nil
-	for i, b := range m.branches {
-		if query == "" || strings.Contains(strings.ToLower(b), query) {
-			m.filteredBranch = append(m.filteredBranch, i)
+func (m *Model) updateAddMatches() {
+	query := strings.ToLower(m.branchInput.Value())
+	m.addMatches = nil
+	if query == "" {
+		m.addCursor = -1
+		return
+	}
+	for _, b := range m.branches {
+		if strings.Contains(strings.ToLower(b), query) {
+			m.addMatches = append(m.addMatches, b)
 		}
 	}
-	if m.branchCursor >= len(m.filteredBranch) {
-		m.branchCursor = max(0, len(m.filteredBranch)-1)
+	if m.addCursor >= len(m.addMatches) {
+		m.addCursor = len(m.addMatches) - 1
+	}
+	if m.addCursor < -1 {
+		m.addCursor = -1
 	}
 }
 
@@ -138,4 +138,13 @@ func (m Model) selectedWorktree() *git.Worktree {
 		return nil
 	}
 	return &m.worktrees[idx]
+}
+
+func (m Model) branchExists(name string) bool {
+	for _, b := range m.branches {
+		if b == name {
+			return true
+		}
+	}
+	return false
 }
