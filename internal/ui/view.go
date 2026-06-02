@@ -34,7 +34,7 @@ func (m Model) renderHeader() string {
 		loading = "  " + loadingStyle.Render("● loading...")
 	}
 
-	titleLine := logoStyle.Render(" 🌳 git-wtm ") + titleStyle.Render(" Worktree Manager ") + loading
+	titleLine := logoStyle.Render("  🌳 git-wtm  ") + "  " + titleStyle.Render("Worktree & Branch Manager") + loading
 
 	wtLabel := " Worktrees "
 	brLabel := " Branches "
