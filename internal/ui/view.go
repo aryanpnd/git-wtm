@@ -30,10 +30,13 @@ func (m Model) View() string {
 
 func (m Model) renderHeader() string {
 	logo := logoStyle.Render(" git-wtm ")
+	subtitle := dimStyle.Render(" Git Worktree Manager")
 	loading := ""
 	if m.loading {
-		loading = dimStyle.Render(" ⟳")
+		loading = dimStyle.Render("  ⟳")
 	}
+
+	titleLine := logo + subtitle + loading
 
 	wtLabel := " Worktrees "
 	brLabel := " Branches "
@@ -47,12 +50,12 @@ func (m Model) renderHeader() string {
 		right = activeTabStyle.Render(brLabel)
 	}
 
-	hint := dimStyle.Render(" ← →")
+	hint := dimStyle.Render("  ← → to switch")
+	tabLine := "  " + left + "  " + right + hint
 
-	headerLine := logo + loading + "   " + left + " " + right + hint
 	sep := separatorStyle.Render(strings.Repeat("─", min(m.width-2, 70)))
 
-	return headerLine + "\n" + sep + "\n\n"
+	return titleLine + "\n\n" + tabLine + "\n" + sep + "\n\n"
 }
 
 func (m Model) renderTabs() string {
@@ -504,9 +507,9 @@ func (m Model) renderBranchItem(b git.Branch, selected bool) string {
 		tags = append(tags, tagActive.Render("ACTIVE"))
 	}
 	if b.Upstream != "" {
-		tags = append(tags, tagTracked.Render("↗"))
+		tags = append(tags, tagTracked.Render("remote"))
 	} else {
-		tags = append(tags, tagLocal.Render("local"))
+		tags = append(tags, tagLocal.Render("local only"))
 	}
 
 	// Sync info
