@@ -173,4 +173,9 @@ var (
 	subtitleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(purple)
+
+	updateStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#1a1a1a")).
+			Background(yellow).
+			Bold(true)
 )

@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	p := tea.NewProgram(ui.NewModel(), tea.WithAltScreen())
+	p := tea.NewProgram(ui.NewModel(version), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)

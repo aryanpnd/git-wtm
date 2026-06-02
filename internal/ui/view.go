@@ -63,7 +63,13 @@ func (m Model) renderHeader() string {
 
 	sep := separatorStyle.Render(strings.Repeat("─", min(m.width-2, 70)))
 
-	return titleLine + "\n\n" + tabLine + "\n" + sep + "\n\n"
+	header := titleLine + "\n\n" + tabLine + "\n" + sep
+	if m.updateInfo != nil {
+		banner := updateStyle.Render(fmt.Sprintf("  ↑ v%s available  —  %s", m.updateInfo.NewVersion, m.updateInfo.UpgradeCmd))
+		header += "\n" + banner
+	}
+
+	return header + "\n\n"
 }
 
 func (m Model) renderTabs() string {

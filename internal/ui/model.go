@@ -31,13 +31,14 @@ const (
 
 type Model struct {
 	// Global
-	activeTab tab
-	width     int
-	height    int
-	err       error
-	statusMsg string
-	loading   bool
-	showHelp  bool
+	activeTab  tab
+	width      int
+	height     int
+	err        error
+	statusMsg  string
+	loading    bool
+	showHelp   bool
+	updateInfo *git.UpdateInfo
 
 	// Worktrees tab
 	worktrees   []git.Worktree
@@ -77,10 +78,14 @@ type errMsg struct{ err error }
 type statusMsg string
 type loadingMsg bool
 type folderPickedMsg string
+type updateCheckMsg *git.UpdateInfo
 
 func (e errMsg) Error() string { return e.err.Error() }
 
-func NewModel() Model {
+var appVersion string
+
+func NewModel(version string) Model {
+	appVersion = version
 	wtSearch := textinput.New()
 	wtSearch.Placeholder = "filter worktrees..."
 	wtSearch.CharLimit = 100
@@ -125,7 +130,13 @@ func (m Model) Init() tea.Cmd {
 		fetchWorktrees,
 		fetchBranches,
 		fetchBranchDetails,
+		checkForUpdate,
 	)
+}
+
+func checkForUpdate() tea.Msg {
+	info, _ := git.CheckForUpdate(appVersion)
+	return updateCheckMsg(info)
 }
 
 func fetchWorktrees() tea.Msg {

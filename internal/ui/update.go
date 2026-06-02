@@ -48,6 +48,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pathInput.SetValue(string(msg))
 		return m, nil
 
+	case updateCheckMsg:
+		m.updateInfo = (*git.UpdateInfo)(msg)
+		return m, nil
+
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
