@@ -20,6 +20,15 @@ func main() {
 		switch os.Args[1] {
 		case "--version", "-v", "version":
 			fmt.Printf("git-wtm %s (%s)\n", version, commit)
+			fmt.Print("checking latest... ")
+			if info, err := git.CheckForUpdate(version); err != nil {
+				fmt.Println("(could not reach GitHub)")
+			} else if info == nil {
+				fmt.Println("up to date")
+			} else {
+				fmt.Printf("\nlatest:    v%s\n", info.NewVersion)
+				fmt.Printf("upgrade:   %s\n", info.UpgradeCmd)
+			}
 			return
 		case "--help", "-h", "help":
 			fmt.Println("git-wtm — Modern TUI for managing Git worktrees and branches")
