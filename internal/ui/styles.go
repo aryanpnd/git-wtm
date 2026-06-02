@@ -27,15 +27,11 @@ var (
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
 			Background(purple).
-			Padding(0, 1).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(purple)
+			Padding(0, 1)
 
 	inactiveTabStyle = lipgloss.NewStyle().
 				Foreground(dimGray).
-				Padding(0, 1).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(dimGray)
+				Padding(0, 1)
 
 	// List items
 	itemStyle = lipgloss.NewStyle()
@@ -122,9 +118,7 @@ var (
 
 	tagLocal = lipgloss.NewStyle().
 			Foreground(dimGray).
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(dimGray).
-			Padding(0, 1)
+			Italic(true)
 
 	// Cards
 	cardBorder = lipgloss.NewStyle().

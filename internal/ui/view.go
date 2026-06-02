@@ -17,8 +17,6 @@ func (m Model) View() string {
 
 	var s strings.Builder
 	s.WriteString(m.renderHeader())
-	s.WriteString(m.renderTabs())
-	s.WriteString("\n")
 
 	switch m.activeTab {
 	case tabWorktrees:
@@ -36,10 +34,7 @@ func (m Model) renderHeader() string {
 	if m.loading {
 		loading = dimStyle.Render(" ⟳")
 	}
-	return logo + loading + "\n"
-}
 
-func (m Model) renderTabs() string {
 	wtLabel := " Worktrees "
 	brLabel := " Branches "
 
@@ -52,9 +47,16 @@ func (m Model) renderTabs() string {
 		right = activeTabStyle.Render(brLabel)
 	}
 
-	tabBar := left + "  " + right
-	hint := dimStyle.Render("    ← → switch tabs")
-	return tabBar + hint + "\n" + separatorStyle.Render(strings.Repeat("─", min(m.width-2, 60))) + "\n"
+	hint := dimStyle.Render(" ← →")
+
+	headerLine := logo + loading + "   " + left + " " + right + hint
+	sep := separatorStyle.Render(strings.Repeat("─", min(m.width-2, 70)))
+
+	return headerLine + "\n" + sep + "\n\n"
+}
+
+func (m Model) renderTabs() string {
+	return ""
 }
 
 // ==========================================
@@ -411,10 +413,14 @@ func (m Model) viewBrList() string {
 		s.WriteString(dimStyle.Render("  No branches found.\n"))
 	}
 
-	// Each branch item is 3 lines (name+tags, detail, blank)
-	maxVisible := (m.height - 12) / 3
-	if maxVisible < 2 {
-		maxVisible = 2
+	// Each branch item is 2 lines (name+tags, time)
+	// Reserve: header(3) + search(2) + box border(2) + scroll(1) + messages(2) + help(2) = 12
+	maxVisible := (m.height - 12) / 2
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+	if maxVisible > 10 {
+		maxVisible = 10
 	}
 
 	visibleStart := 0
@@ -483,49 +489,40 @@ func (m Model) viewBrList() string {
 
 func (m Model) renderBranchItem(b git.Branch, selected bool) string {
 	cursor := "  "
-	style := dimStyle
 	if selected {
 		cursor = "▸ "
-		style = selectedItemStyle
 	}
 
-	name := style.Render(b.Name)
-	if !selected {
-		name = branchStyle.Render(b.Name)
+	name := branchStyle.Render(b.Name)
+	if selected {
+		name = selectedItemStyle.Render(b.Name)
 	}
 
-	// Tags
+	// Tags — keep it simple and compact
 	var tags []string
 	if b.IsCurrent {
 		tags = append(tags, tagActive.Render("ACTIVE"))
 	}
 	if b.Upstream != "" {
-		tags = append(tags, tagTracked.Render("TRACKED"))
+		tags = append(tags, tagTracked.Render("↗"))
 	} else {
 		tags = append(tags, tagLocal.Render("local"))
 	}
 
 	// Sync info
-	var sync []string
 	if b.Ahead > 0 {
-		sync = append(sync, aheadStyle.Render(fmt.Sprintf("↑%d", b.Ahead)))
+		tags = append(tags, aheadStyle.Render(fmt.Sprintf("↑%d", b.Ahead)))
 	}
 	if b.Behind > 0 {
-		sync = append(sync, behindStyle.Render(fmt.Sprintf("↓%d", b.Behind)))
+		tags = append(tags, behindStyle.Render(fmt.Sprintf("↓%d", b.Behind)))
 	}
 
 	line := cursor + name + "  " + strings.Join(tags, " ")
-	if len(sync) > 0 {
-		line += "  " + strings.Join(sync, " ")
-	}
 
-	// Second line: last commit time
-	detail := "     " + dimStyle.Render(b.CommitTime)
-	if b.Upstream != "" {
-		detail += dimStyle.Render(" → "+b.Upstream)
-	}
+	// Second line: compact time + upstream
+	detail := "    " + dimStyle.Render(b.CommitTime)
 
-	return line + "\n" + detail + "\n\n"
+	return line + "\n" + detail + "\n"
 }
 
 func (m Model) viewBrDetail() string {
