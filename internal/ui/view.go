@@ -97,7 +97,14 @@ func (m Model) viewWtList() string {
 		s.WriteString("  " + dimStyle.Render(fmt.Sprintf("filter: %q (%d)", m.wtSearch.Value(), len(m.wtFiltered))) + "\n\n")
 	}
 
-	if len(m.worktrees) == 0 && !m.loading {
+	if m.loading && len(m.worktrees) == 0 {
+		s.WriteString(dimStyle.Render("  Loading worktrees...") + "\n")
+		s.WriteString("\n")
+		s.WriteString(m.wtShortHelp())
+		return s.String()
+	}
+
+	if len(m.worktrees) == 0 {
 		s.WriteString(dimStyle.Render("  No worktrees found. Press 'a' to add one.\n"))
 	}
 
@@ -420,7 +427,14 @@ func (m Model) viewBrList() string {
 		s.WriteString("  " + dimStyle.Render(fmt.Sprintf("filter: %q (%d)", m.brSearch.Value(), len(m.brFiltered))) + "\n\n")
 	}
 
-	if len(m.branchList) == 0 && !m.loading {
+	if m.loading && len(m.branchList) == 0 {
+		s.WriteString(dimStyle.Render("  Loading branches...") + "\n")
+		s.WriteString("\n")
+		s.WriteString(m.brShortHelp())
+		return s.String()
+	}
+
+	if len(m.branchList) == 0 {
 		s.WriteString(dimStyle.Render("  No branches found.\n"))
 	}
 
@@ -655,11 +669,12 @@ func (m Model) renderHelpLine(keys []helpKey) string {
 
 func (m Model) wtShortHelp() string {
 	return m.renderHelpLine([]helpKey{
+		{"←/→", "switch tab"},
 		{"a", "add"},
-		{"/", "search"},
 		{"d", "remove"},
-		{"r", "refresh"},
-		{"enter", "details"},
+		{"o", "terminal"},
+		{"e", "editor"},
+		{"/", "search"},
 		{"?", "help"},
 		{"q", "quit"},
 	})
@@ -667,10 +682,11 @@ func (m Model) wtShortHelp() string {
 
 func (m Model) brShortHelp() string {
 	return m.renderHelpLine([]helpKey{
+		{"←/→", "switch tab"},
 		{"c", "checkout"},
 		{"a", "create"},
-		{"R", "rename"},
 		{"d", "delete"},
+		{"m", "merge"},
 		{"/", "search"},
 		{"?", "help"},
 		{"q", "quit"},
@@ -684,9 +700,11 @@ func (m Model) wtFullHelp() string {
 		title string
 		keys  []helpKey
 	}{
-		{"Navigate", []helpKey{{"j/↓", "down"}, {"k/↑", "up"}, {"enter", "details"}, {"/", "search"}}},
-		{"Actions", []helpKey{{"a", "add worktree"}, {"d", "remove"}, {"p", "prune stale"}}},
-		{"Tools", []helpKey{{"o", "open terminal"}, {"e", "open editor"}, {"f", "fetch"}, {"r", "refresh"}}},
+		{"Navigation", []helpKey{{"j/↓", "move down"}, {"k/↑", "move up"}, {"←/→", "switch tab"}, {"enter", "view details"}, {"/", "search/filter"}}},
+		{"Actions", []helpKey{{"a", "add worktree"}, {"d/x", "remove worktree"}, {"p", "prune stale worktrees"}}},
+		{"Tools", []helpKey{{"o", "open terminal"}, {"e", "open editor"}, {"f", "fetch all remotes"}, {"r", "refresh list"}}},
+		{"Add View", []helpKey{{"↑/↓", "navigate suggestions"}, {"tab", "switch to path field"}, {"ctrl+o", "open folder picker"}, {"esc", "cancel"}}},
+		{"General", []helpKey{{"?", "toggle help"}, {"q", "quit"}, {"ctrl+c", "force quit"}}},
 	}
 	for _, sec := range sections {
 		s.WriteString(dimStyle.Render("  "+sec.title) + "\n")
@@ -708,9 +726,10 @@ func (m Model) brFullHelp() string {
 		title string
 		keys  []helpKey
 	}{
-		{"Navigate", []helpKey{{"j/↓", "down"}, {"k/↑", "up"}, {"enter", "details"}, {"/", "search"}}},
-		{"Actions", []helpKey{{"c", "checkout"}, {"a/n", "create"}, {"R", "rename"}, {"d", "delete"}, {"m", "merge into current"}}},
-		{"Tools", []helpKey{{"f", "fetch remotes"}, {"r", "refresh"}}},
+		{"Navigation", []helpKey{{"j/↓", "move down"}, {"k/↑", "move up"}, {"←/→", "switch tab"}, {"enter", "view details"}, {"/", "search/filter"}}},
+		{"Actions", []helpKey{{"c", "checkout branch"}, {"a/n", "create new branch"}, {"R", "rename branch"}, {"d/x", "delete branch"}, {"m", "merge into current"}}},
+		{"Tools", []helpKey{{"f", "fetch all remotes"}, {"r", "refresh list"}}},
+		{"General", []helpKey{{"?", "toggle help"}, {"q", "quit"}, {"ctrl+c", "force quit"}}},
 	}
 	for _, sec := range sections {
 		s.WriteString(dimStyle.Render("  "+sec.title) + "\n")

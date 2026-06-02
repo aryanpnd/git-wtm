@@ -1,0 +1,77 @@
+version: 2
+
+project_name: git-wtm
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: git-wtm
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - repository:
+      owner: aryanpnd
+      name: homebrew-tap
+    directory: Formula
+    homepage: "https://github.com/aryanpnd/git-wtm"
+    description: "Modern TUI for managing Git worktrees and branches"
+    license: "MIT"
+    test: |
+      assert_match "must be run inside a git repository", shell_output("#{bin}/git-wtm 2>&1", 1)
+
+scoops:
+  - repository:
+      owner: aryanpnd
+      name: scoop-bucket
+    homepage: "https://github.com/aryanpnd/git-wtm"
+    description: "Modern TUI for managing Git worktrees and branches"
+    license: MIT
+
+winget:
+  - name: git-wtm
+    publisher: aryanpnd
+    short_description: "Modern TUI for managing Git worktrees and branches"
+    license: MIT
+    publisher_url: "https://github.com/aryanpnd"
+    homepage: "https://github.com/aryanpnd/git-wtm"
+    repository:
+      owner: aryanpnd
+      name: winget-pkgs
+      branch: "git-wtm-{{.Version}}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master

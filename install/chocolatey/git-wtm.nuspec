@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>git-wtm</id>
+    <version>0.0.0</version>
+    <title>git-wtm</title>
+    <authors>aryanpnd</authors>
+    <owners>aryanpnd</owners>
+    <projectUrl>https://github.com/aryanpnd/git-wtm</projectUrl>
+    <licenseUrl>https://github.com/aryanpnd/git-wtm/blob/main/LICENSE</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/aryanpnd/git-wtm/main/assets/logo.svg</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A modern, interactive TUI for managing Git worktrees and branches. No more memorizing commands — just navigate, search, and act.</description>
+    <summary>Modern TUI for Git worktree and branch management</summary>
+    <tags>git worktree branch tui terminal cli</tags>
+    <packageSourceUrl>https://github.com/aryanpnd/git-wtm</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/aryanpnd/git-wtm/issues</bugTrackerUrl>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

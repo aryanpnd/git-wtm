@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1b26"/>
+      <stop offset="100%" style="stop-color:#24283b"/>
+    </linearGradient>
+    <linearGradient id="tree" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#73daca"/>
+      <stop offset="100%" style="stop-color:#2ac3de"/>
+    </linearGradient>
+    <linearGradient id="branch1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7aa2f7"/>
+      <stop offset="100%" style="stop-color:#bb9af7"/>
+    </linearGradient>
+    <linearGradient id="branch2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff9e64"/>
+      <stop offset="100%" style="stop-color:#f7768e"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect x="32" y="32" width="448" height="448" rx="64" fill="url(#bg)"/>
+  <!-- Main trunk -->
+  <path d="M256 400 L256 180" stroke="url(#tree)" stroke-width="28" stroke-linecap="round"/>
+  <!-- Left branch -->
+  <path d="M256 280 C220 280 180 250 160 200" stroke="url(#branch1)" stroke-width="20" stroke-linecap="round" fill="none"/>
+  <!-- Right branch -->
+  <path d="M256 240 C290 240 330 210 350 170" stroke="url(#branch2)" stroke-width="20" stroke-linecap="round" fill="none"/>
+  <!-- Nodes (worktrees) -->
+  <circle cx="256" cy="160" r="24" fill="url(#tree)"/>
+  <circle cx="160" cy="185" r="20" fill="url(#branch1)"/>
+  <circle cx="350" cy="155" r="20" fill="url(#branch2)"/>
+  <!-- Small dots for leaves/activity -->
+  <circle cx="256" cy="160" r="10" fill="#1a1b26" opacity="0.6"/>
+  <circle cx="160" cy="185" r="8" fill="#1a1b26" opacity="0.6"/>
+  <circle cx="350" cy="155" r="8" fill="#1a1b26" opacity="0.6"/>
+</svg>

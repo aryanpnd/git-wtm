@@ -116,12 +116,12 @@ func NewModel() Model {
 		brCreateInput: brCreate,
 		brRenameInput: brRename,
 		addCursor:     -1,
+		loading:       true,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		func() tea.Msg { return loadingMsg(true) },
 		fetchWorktrees,
 		fetchBranches,
 		fetchBranchDetails,

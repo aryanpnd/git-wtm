@@ -1,3 +1,18 @@
+# Binaries
+git-wtm
+git-wtm.exe
 wt
 worktree-manager
+
+# GoReleaser
 dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,51 @@
+name: Publish to Chocolatey
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  chocolatey:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Download release asset
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $url = "https://github.com/aryanpnd/git-wtm/releases/download/v${version}/git-wtm_windows_amd64.zip"
+          Invoke-WebRequest -Uri $url -OutFile git-wtm.zip
+
+      - name: Get checksum
+        id: checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Path git-wtm.zip -Algorithm SHA256).Hash.ToLower()
+          echo "sha256=$hash" >> $env:GITHUB_OUTPUT
+
+      - name: Update nuspec version
+        shell: pwsh
+        run: |
+          $nuspec = Get-Content install/chocolatey/git-wtm.nuspec
+          $nuspec = $nuspec -replace '<version>0.0.0</version>', "<version>${{ steps.version.outputs.version }}</version>"
+          Set-Content install/chocolatey/git-wtm.nuspec $nuspec
+
+      - name: Update install script checksum
+        shell: pwsh
+        run: |
+          $script = Get-Content install/chocolatey/tools/chocolateyinstall.ps1
+          $script = $script -replace '%CHECKSUM64%', '${{ steps.checksum.outputs.sha256 }}'
+          Set-Content install/chocolatey/tools/chocolateyinstall.ps1 $script
+
+      - name: Pack and push
+        shell: pwsh
+        run: |
+          cd install/chocolatey
+          choco pack
+          choco push --source https://push.chocolatey.org/ --api-key ${{ secrets.CHOCOLATEY_API_KEY }}
