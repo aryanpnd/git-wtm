@@ -5,13 +5,14 @@
 <h1 align="center">git-wtm</h1>
 
 <p align="center">
-  <strong>A modern, interactive TUI for managing Git worktrees and branches.</strong><br/>
-  No more memorizing commands — just navigate, search, and act.
+  <strong>A lightweight, modern TUI for managing Git worktrees and branches.</strong><br/>
+  Single binary. No dependencies. No more memorizing commands — just navigate, search, and act.
 </p>
 
 <p align="center">
   <a href="https://github.com/aryanpnd/git-wtm/releases/latest"><img src="https://img.shields.io/github/v/release/aryanpnd/git-wtm?style=flat-square&color=73daca" alt="Release"></a>
   <a href="https://github.com/aryanpnd/git-wtm/actions"><img src="https://img.shields.io/github/actions/workflow/status/aryanpnd/git-wtm/release.yml?style=flat-square" alt="Build"></a>
+  <img src="https://img.shields.io/badge/binary-7.2MB-73daca?style=flat-square" alt="Binary size">
   <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/Platform-macOS%20|%20Linux%20|%20Windows-lightgrey?style=flat-square" alt="Platform">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License"></a>
