@@ -246,15 +246,12 @@ func (m Model) selectedBranch() *git.Branch {
 }
 
 func buildCreateBases(branches []git.Branch) []string {
-	bases := []string{"current HEAD"}
 	for _, b := range branches {
 		if b.Name == "main" || b.Name == "master" {
-			bases = append(bases, b.Name)
-			bases = append(bases, b.Name+" (latest)")
-			break
+			return []string{b.Name + " (latest)", b.Name, "current HEAD"}
 		}
 	}
-	return bases
+	return []string{"current HEAD"}
 }
 
 func (m Model) branchExists(name string) bool {
@@ -264,4 +261,18 @@ func (m Model) branchExists(name string) bool {
 		}
 	}
 	return false
+}
+
+func (m *Model) updateFieldWidths() {
+	// inner width = terminal - 2(margin) - 2(border) - 2(padding)
+	w := m.width - 6
+	if w < 20 {
+		w = 20
+	}
+	m.addInput.Width = w
+	m.pathInput.Width = w
+	m.brCreateInput.Width = w
+	m.brRenameInput.Width = w
+	m.wtSearch.Width = w
+	m.brSearch.Width = w
 }

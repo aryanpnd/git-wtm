@@ -145,6 +145,16 @@ var (
 	inactiveInputStyle = lipgloss.NewStyle().
 				Foreground(dimGray)
 
+	focusedFieldStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(purple).
+				Padding(0, 1)
+
+	unfocusedFieldStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(dimGray).
+				Padding(0, 1)
+
 	searchStyle = lipgloss.NewStyle().
 			Foreground(purple).
 			Bold(true)

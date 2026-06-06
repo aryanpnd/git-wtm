@@ -15,6 +15,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.updateFieldWidths()
 		return m, nil
 
 	case worktreeListMsg:
@@ -258,6 +259,7 @@ func (m Model) updateWtList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Step 0: Branch name input
 	if m.addStep == 0 {
 		switch msg.String() {
 		case "esc":
@@ -266,12 +268,6 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "tab":
 			m.addStep = 1
 			m.addInput.Blur()
-			m.pathInput.Focus()
-			return m, textinput.Blink
-		case "ctrl+b":
-			if len(m.wtAddBases) > 0 {
-				m.wtAddBaseIdx = (m.wtAddBaseIdx + 1) % len(m.wtAddBases)
-			}
 			return m, nil
 		case "up", "ctrl+p":
 			if m.addCursor > 0 {
@@ -286,34 +282,7 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
-			branch := m.addInput.Value()
-			if m.addCursor >= 0 && m.addCursor < len(m.addMatches) {
-				branch = m.addMatches[m.addCursor]
-			}
-			if branch == "" {
-				return m, nil
-			}
-			path := m.pathInput.Value()
-			createNew := !m.branchExists(branch)
-			baseIdx := m.wtAddBaseIdx
-			bases := m.wtAddBases
-			m.wtView = viewList
-			m.loading = true
-			return m, func() tea.Msg {
-				base := m.resolveBase(bases, baseIdx)
-				if err := git.AddWorktree(path, branch, createNew, base); err != nil {
-					return errMsg{err}
-				}
-				displayPath := path
-				if displayPath == "" {
-					displayPath = git.DefaultWorktreePath(branch)
-				}
-				action := "Checked out"
-				if createNew {
-					action = "Created"
-				}
-				return statusMsg(action + " → " + displayPath)
-			}
+			return m, m.doAddWorktree()
 		default:
 			var cmd tea.Cmd
 			m.addInput, cmd = m.addInput.Update(msg)
@@ -323,23 +292,51 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Step 1: Base selector (← → to pick)
 	if m.addStep == 1 {
 		switch msg.String() {
-		case "esc", "shift+tab":
+		case "esc":
+			m.wtView = viewList
+			return m, nil
+		case "shift+tab":
 			m.addStep = 0
-			m.pathInput.Blur()
 			m.addInput.Focus()
 			return m, textinput.Blink
+		case "tab":
+			m.addStep = 2
+			m.pathInput.Focus()
+			return m, textinput.Blink
+		case "left", "h":
+			if m.wtAddBaseIdx > 0 {
+				m.wtAddBaseIdx--
+			}
+			return m, nil
+		case "right", "l":
+			if m.wtAddBaseIdx < len(m.wtAddBases)-1 {
+				m.wtAddBaseIdx++
+			}
+			return m, nil
+		case "enter":
+			return m, m.doAddWorktree()
+		}
+		return m, nil
+	}
+
+	// Step 2: Path input
+	if m.addStep == 2 {
+		switch msg.String() {
+		case "esc":
+			m.wtView = viewList
+			return m, nil
+		case "shift+tab":
+			m.addStep = 1
+			m.pathInput.Blur()
+			return m, nil
 		case "tab":
 			m.addStep = 0
 			m.pathInput.Blur()
 			m.addInput.Focus()
 			return m, textinput.Blink
-		case "ctrl+b":
-			if len(m.wtAddBases) > 0 {
-				m.wtAddBaseIdx = (m.wtAddBaseIdx + 1) % len(m.wtAddBases)
-			}
-			return m, nil
 		case "ctrl+o":
 			return m, func() tea.Msg {
 				path, err := git.PickFolder()
@@ -349,31 +346,7 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return folderPickedMsg(path)
 			}
 		case "enter":
-			branch := m.addInput.Value()
-			if branch == "" {
-				return m, nil
-			}
-			path := m.pathInput.Value()
-			createNew := !m.branchExists(branch)
-			baseIdx := m.wtAddBaseIdx
-			bases := m.wtAddBases
-			m.wtView = viewList
-			m.loading = true
-			return m, func() tea.Msg {
-				base := m.resolveBase(bases, baseIdx)
-				if err := git.AddWorktree(path, branch, createNew, base); err != nil {
-					return errMsg{err}
-				}
-				displayPath := path
-				if displayPath == "" {
-					displayPath = git.DefaultWorktreePath(branch)
-				}
-				action := "Checked out"
-				if createNew {
-					action = "Created"
-				}
-				return statusMsg(action + " → " + displayPath)
-			}
+			return m, m.doAddWorktree()
 		default:
 			var cmd tea.Cmd
 			m.pathInput, cmd = m.pathInput.Update(msg)
@@ -384,11 +357,45 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) resolveBase(bases []string, idx int) string {
-	if idx == 0 || len(bases) == 0 {
+func (m *Model) doAddWorktree() tea.Cmd {
+	branch := m.addInput.Value()
+	if m.addCursor >= 0 && m.addCursor < len(m.addMatches) {
+		branch = m.addMatches[m.addCursor]
+	}
+	if branch == "" {
+		return nil
+	}
+	path := m.pathInput.Value()
+	createNew := !m.branchExists(branch)
+	baseIdx := m.wtAddBaseIdx
+	bases := m.wtAddBases
+	m.wtView = viewList
+	m.loading = true
+	return func() tea.Msg {
+		base := resolveBase(bases, baseIdx)
+		if err := git.AddWorktree(path, branch, createNew, base); err != nil {
+			return errMsg{err}
+		}
+		displayPath := path
+		if displayPath == "" {
+			displayPath = git.DefaultWorktreePath(branch)
+		}
+		action := "Checked out"
+		if createNew {
+			action = "Created"
+		}
+		return statusMsg(action + " → " + displayPath)
+	}
+}
+
+func resolveBase(bases []string, idx int) string {
+	if len(bases) == 0 {
 		return ""
 	}
 	base := bases[idx]
+	if base == "current HEAD" {
+		return ""
+	}
 	if strings.HasSuffix(base, " (latest)") {
 		branchName := strings.TrimSuffix(base, " (latest)")
 		git.FetchBranch(branchName)
@@ -636,7 +643,7 @@ func (m Model) updateBrCreate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.brView = viewList
 		m.loading = true
 		return m, func() tea.Msg {
-			base := m.resolveBase(bases, baseIdx)
+			base := resolveBase(bases, baseIdx)
 			if err := git.CreateBranch(name, base); err != nil {
 				return errMsg{err}
 			}
