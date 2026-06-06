@@ -40,6 +40,12 @@ type Model struct {
 	showHelp   bool
 	updateInfo *git.UpdateInfo
 
+	// Modal popup
+	showModal    bool
+	modalTitle   string
+	modalMessage string
+	modalIsError bool
+
 	// Worktrees tab
 	worktrees   []git.Worktree
 	wtFiltered  []int
@@ -49,12 +55,14 @@ type Model struct {
 	wtSearching bool
 
 	// Add worktree
-	branches   []string
-	addInput   textinput.Model
-	pathInput  textinput.Model
-	addMatches []string
-	addCursor  int
-	addStep    int
+	branches      []string
+	addInput      textinput.Model
+	pathInput     textinput.Model
+	addMatches    []string
+	addCursor     int
+	addStep       int
+	wtAddBaseIdx  int
+	wtAddBases    []string
 
 	// Remove worktree
 	confirmForce bool
@@ -81,6 +89,11 @@ type statusMsg string
 type loadingMsg bool
 type folderPickedMsg string
 type updateCheckMsg *git.UpdateInfo
+type modalMsg struct {
+	title   string
+	message string
+	isError bool
+}
 
 func (e errMsg) Error() string { return e.err.Error() }
 
@@ -232,13 +245,13 @@ func (m Model) selectedBranch() *git.Branch {
 	return &m.branchList[idx]
 }
 
-// buildCreateBases returns the list of base options for branch creation:
-// "current HEAD" always first, then main/master if they exist.
 func buildCreateBases(branches []git.Branch) []string {
 	bases := []string{"current HEAD"}
 	for _, b := range branches {
 		if b.Name == "main" || b.Name == "master" {
 			bases = append(bases, b.Name)
+			bases = append(bases, b.Name+" (latest)")
+			break
 		}
 	}
 	return bases

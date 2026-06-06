@@ -15,9 +15,7 @@ var (
 	logoStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#2D9C6F")).
-			Padding(0, 0).
-			MarginBottom(1)
+			Background(lipgloss.Color("#2D9C6F"))
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -31,16 +29,14 @@ var (
 	activeTabStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#45475A")).
-			Padding(0, 1)
+			Background(purple).
+			Padding(0, 2)
 
 	inactiveTabStyle = lipgloss.NewStyle().
 				Foreground(dimGray).
-				Padding(0, 1)
+				Padding(0, 2)
 
 	// List items
-	itemStyle = lipgloss.NewStyle()
-
 	selectedItemStyle = lipgloss.NewStyle().
 				Foreground(purple).
 				Bold(true)
@@ -178,4 +174,23 @@ var (
 			Foreground(lipgloss.Color("#1a1a1a")).
 			Background(yellow).
 			Bold(true)
+
+	// Modal
+	modalErrorStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(red).
+			Padding(1, 3)
+
+	modalSuccessStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(green).
+				Padding(1, 3)
+
+	modalTitleError = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(red)
+
+	modalTitleSuccess = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(green)
 )

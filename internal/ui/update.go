@@ -2,6 +2,7 @@ package ui
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -40,7 +41,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case errMsg:
-		m.err = msg.err
+		m.showModal = true
+		m.modalTitle = "Error"
+		m.modalMessage = msg.err.Error()
+		m.modalIsError = true
+		m.loading = false
+		return m, nil
+
+	case modalMsg:
+		m.showModal = true
+		m.modalTitle = msg.title
+		m.modalMessage = msg.message
+		m.modalIsError = msg.isError
 		m.loading = false
 		return m, nil
 
@@ -64,6 +76,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+
+		if m.showModal {
+			m.showModal = false
+			return m, nil
 		}
 
 		// Tab switching (only in list views, not in sub-views)
@@ -171,6 +188,8 @@ func (m Model) updateWtList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.addInput.Focus()
 		m.addMatches = nil
 		m.addCursor = -1
+		m.wtAddBaseIdx = 0
+		m.wtAddBases = m.brCreateBases
 		m.statusMsg = ""
 		m.err = nil
 		return m, textinput.Blink
@@ -249,6 +268,11 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.addInput.Blur()
 			m.pathInput.Focus()
 			return m, textinput.Blink
+		case "ctrl+b":
+			if len(m.wtAddBases) > 0 {
+				m.wtAddBaseIdx = (m.wtAddBaseIdx + 1) % len(m.wtAddBases)
+			}
+			return m, nil
 		case "up", "ctrl+p":
 			if m.addCursor > 0 {
 				m.addCursor--
@@ -271,10 +295,13 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			path := m.pathInput.Value()
 			createNew := !m.branchExists(branch)
+			baseIdx := m.wtAddBaseIdx
+			bases := m.wtAddBases
 			m.wtView = viewList
 			m.loading = true
 			return m, func() tea.Msg {
-				if err := git.AddWorktree(path, branch, createNew); err != nil {
+				base := m.resolveBase(bases, baseIdx)
+				if err := git.AddWorktree(path, branch, createNew, base); err != nil {
 					return errMsg{err}
 				}
 				displayPath := path
@@ -308,6 +335,11 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pathInput.Blur()
 			m.addInput.Focus()
 			return m, textinput.Blink
+		case "ctrl+b":
+			if len(m.wtAddBases) > 0 {
+				m.wtAddBaseIdx = (m.wtAddBaseIdx + 1) % len(m.wtAddBases)
+			}
+			return m, nil
 		case "ctrl+o":
 			return m, func() tea.Msg {
 				path, err := git.PickFolder()
@@ -323,10 +355,13 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			path := m.pathInput.Value()
 			createNew := !m.branchExists(branch)
+			baseIdx := m.wtAddBaseIdx
+			bases := m.wtAddBases
 			m.wtView = viewList
 			m.loading = true
 			return m, func() tea.Msg {
-				if err := git.AddWorktree(path, branch, createNew); err != nil {
+				base := m.resolveBase(bases, baseIdx)
+				if err := git.AddWorktree(path, branch, createNew, base); err != nil {
 					return errMsg{err}
 				}
 				displayPath := path
@@ -347,6 +382,19 @@ func (m Model) updateWtAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) resolveBase(bases []string, idx int) string {
+	if idx == 0 || len(bases) == 0 {
+		return ""
+	}
+	base := bases[idx]
+	if strings.HasSuffix(base, " (latest)") {
+		branchName := strings.TrimSuffix(base, " (latest)")
+		git.FetchBranch(branchName)
+		return "origin/" + branchName
+	}
+	return base
 }
 
 func (m Model) updateWtRemove(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -583,13 +631,12 @@ func (m Model) updateBrCreate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if name == "" {
 			return m, nil
 		}
-		base := ""
-		if len(m.brCreateBases) > 0 && m.brCreateBaseIdx > 0 {
-			base = m.brCreateBases[m.brCreateBaseIdx]
-		}
+		baseIdx := m.brCreateBaseIdx
+		bases := m.brCreateBases
 		m.brView = viewList
 		m.loading = true
 		return m, func() tea.Msg {
+			base := m.resolveBase(bases, baseIdx)
 			if err := git.CreateBranch(name, base); err != nil {
 				return errMsg{err}
 			}

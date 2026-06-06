@@ -178,7 +178,7 @@ func DefaultWorktreePath(branch string) string {
 	return filepath.Join(parent, repoName+"-"+safeBranch)
 }
 
-func AddWorktree(path, branch string, createBranch bool) error {
+func AddWorktree(path, branch string, createBranch bool, base string) error {
 	if path == "" {
 		path = DefaultWorktreePath(branch)
 	} else if !filepath.IsAbs(path) {
@@ -192,11 +192,22 @@ func AddWorktree(path, branch string, createBranch bool) error {
 	args := []string{"worktree", "add"}
 	if createBranch {
 		args = append(args, "-b", branch, path)
+		if base != "" {
+			args = append(args, base)
+		}
 	} else {
 		args = append(args, path, branch)
 	}
 
 	out, err := exec.Command("git", args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func FetchBranch(branch string) error {
+	out, err := exec.Command("git", "fetch", "origin", branch).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 	}
